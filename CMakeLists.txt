@@ -8,4 +8,4 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 
 add_subdirectory(main)
-#add_subdirectory(renodeAPI)
+add_subdirectory(renodeAPI)

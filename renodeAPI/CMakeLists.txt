@@ -1,16 +1,18 @@
 #src/submodule/CMaketLists.txt
-
 set(MODULE_NAME renodeAPI)
 set(MODULE_ALIAS ${MODULE_NAME}::${MODULE_NAME})  # exported alias
 set(MODULE_PUBLIC_INCLUDE include)   # relative include dir
 
-set(MODULE_SOURCES
-    src/zmqInterface.cpp
-    # add other source files here
-)
+find_package(cppzmq REQUIRED)
+
 set(MODULE_PUBLIC_HEADERS
     include/zmqInterface.hpp
     # add public headers here
+)
+
+set(MODULE_SOURCES
+    src/zmqInterface.cpp
+    # add other source files here
 )
 
 # --- common reuse logic (no changes below) ---
@@ -27,9 +29,14 @@ target_include_directories(${MODULE_NAME}
         $<INSTALL_INTERFACE:include/${MODULE_NAME}>
 )
 
+target_link_libraries(${MODULE_NAME}
+  PUBLIC cppzmq
+)
+
 target_compile_features(${MODULE_NAME} PUBLIC cxx_std_20)
 
 # create a consistent exported alias for consumers
 if (NOT TARGET ${MODULE_ALIAS})
     add_library(${MODULE_ALIAS} ALIAS ${MODULE_NAME})
 endif()
+

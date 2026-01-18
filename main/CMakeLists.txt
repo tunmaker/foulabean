@@ -39,7 +39,7 @@ set_target_properties(${TARGET_NAME} PROPERTIES
 
 target_link_libraries(${TARGET_NAME}
     PRIVATE Qt6::Quick
-    #PRIVATE renodeAPI::renodeAPI
+    PRIVATE renodeAPI::renodeAPI
 )
 
 #target_sources(${TARGET_NAME}
