@@ -6,13 +6,11 @@ set(MODULE_PUBLIC_INCLUDE include)   # relative include dir
 find_package(cppzmq REQUIRED)
 
 set(MODULE_PUBLIC_HEADERS
-    include/zmqInterface.hpp
-    # add public headers here
+    include/renodeInterface.h
 )
 
 set(MODULE_SOURCES
-    src/zmqInterface.cpp
-    # add other source files here
+    src/renodeInterface.cpp
 )
 
 # --- common reuse logic (no changes below) ---

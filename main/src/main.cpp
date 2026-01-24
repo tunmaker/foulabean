@@ -2,7 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <iostream>
 #include <thread>
-#include "zmqInterface.hpp"
+#include "renodeInterface.h"
 
 int main(int argc, char *argv[])
 {

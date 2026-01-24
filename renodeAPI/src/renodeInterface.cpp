@@ -1,4 +1,4 @@
-#include "zmqInterface.hpp"
+#include "renodeInterface.h"
 
 #include <arpa/inet.h>
 #include <netdb.h>
