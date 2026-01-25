@@ -1,5 +1,6 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#include <cstddef>
 #include <iostream>
 
 #include "renodeInterface.h"
@@ -16,7 +17,7 @@ int main(int argc, char *argv[]) {
   engine.loadFromModule("digitwin", "Main");
 
   auto renode = ExternalControlClient::connect("127.0.0.1", 5555);
-  if (renode->connected) {
+  if (renode != nullptr) {
     if (renode->performHandshake()) {
       std::cout << "handshake success" << '\n';
     } else {

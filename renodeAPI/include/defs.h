@@ -5,8 +5,26 @@
 #include <array>
 #include <vector>
 #include <netdb.h>
+#include <functional>
+#include <map>
 
 #define SERVER_START_COMMAND "emulation CreateExternalControlServer \"NAME\" PORT"
+namespace renode{
+
+// ADC channel value type
+using AdcValue = double;
+
+// GPIO state
+enum class GpioState : uint8_t { Low = 0, High = 1 };
+
+using GpioCallback = std::function<void(int pin, GpioState newState)>;
+
+// Peripheral descriptor (type + path + optional metadata)
+struct PeripheralDescriptor {
+    std::string type;
+    std::string path;
+    std::map<std::string, std::string> metadata;
+};
 
 enum class api_commands : int8_t {
     ANY_COMMAND = 0,
@@ -42,7 +60,7 @@ enum renode_return_code {
   INVALID_COMMAND,      // code, command
   SUCCESS_WITH_DATA,    // code, command, data
   SUCCESS_WITHOUT_DATA, // code, command
-  OK_HANDSHAKE,    // code
+  OK_HANDSHAKE = 5,     // code
   ASYNC_EVENT,          // code, command, callback id, data
 } ;
 
@@ -63,7 +81,7 @@ struct renode_error{
     void *data;
 } ;
 
-enum renode_time_unit{
+enum class TimeUnit{
     TU_MICROSECONDS =       1,
     TU_MILLISECONDS =    1000,
     TU_SECONDS      = 1000000,
@@ -75,12 +93,13 @@ struct renode_gpio_event_data {
 } ;
 
 
-enum renode_access_width {
+// Bus access widths enum class AccessWidth { Byte = 1, Word = 2, DWord = 4, QWord = 8 };
+enum class AccessWidth  {
     AW_MULTI_BYTE  = 0,
     AW_BYTE        = 1,
     AW_WORD        = 2,
-    AW_DOUBLE_WORD = 4,
-    AW_QUAD_WORD   = 8,
+    AW_DWord       = 4,
+    AW_QWord       = 8,
 };
 
 // Helpers to write little-endian
@@ -122,4 +141,5 @@ static bool read_all(int fd, uint8_t *buf, size_t len) {
 // helper to read one byte, returning true on success
 static bool read_byte(int fd, uint8_t &out) {
     return read_all(fd, &out, 1);
+}
 }
