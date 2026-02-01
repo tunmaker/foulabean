@@ -3,7 +3,8 @@ set(MODULE_NAME renodeAPI)
 set(MODULE_ALIAS ${MODULE_NAME}::${MODULE_NAME})  # exported alias
 set(MODULE_PUBLIC_INCLUDE include)   # relative include dir
 
-find_package(cppzmq REQUIRED)
+# Note: cppzmq removed - using raw POSIX sockets instead (ZMQ incompatible with Renode protocol)
+#find_package(cppzmq REQUIRED)
 
 set(MODULE_PUBLIC_HEADERS
     include/renodeInterface.h
@@ -30,9 +31,10 @@ target_include_directories(${MODULE_NAME}
         $<INSTALL_INTERFACE:include/${MODULE_NAME}>
 )
 
-target_link_libraries(${MODULE_NAME}
-  PUBLIC cppzmq
-)
+# Note: cppzmq removed - using raw POSIX sockets (ZMQ incompatible with Renode protocol)
+#target_link_libraries(${MODULE_NAME}
+#  PUBLIC cppzmq
+#)
 
 target_compile_features(${MODULE_NAME} PUBLIC cxx_std_20)
 

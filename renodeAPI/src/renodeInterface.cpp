@@ -1,6 +1,7 @@
 // renodeInterface.cpp
 #include "renodeInterface.h"
 #include "renodeMachine.h"
+#include "renodeInternal.h"
 #include "defs.h"
 
 #include <arpa/inet.h>
@@ -21,20 +22,6 @@
 #include <map>
 
 namespace renode {
-
-// ExternalControlClient::Impl definition
-struct ExternalControlClient::Impl {
-  std::string host;
-  uint16_t port;
-  int sock_fd = -1;  // Socket file descriptor
-  bool connected = false;
-  std::mutex mtx;
-
-  // Cache of machines
-  std::map<std::string, std::weak_ptr<AMachine>> machines;
-
-  Impl(const std::string &h, uint16_t p) : host(h), port(p) {}
-};
 
 std::unique_ptr<ExternalControlClient>
 ExternalControlClient::connect(const std::string &host, uint16_t port) {
@@ -126,6 +113,19 @@ bool ExternalControlClient::performHandshake() {
 // return them. expected_command is used to assert server echoed command (not
 // enforced if 0xFF)
 std::vector<uint8_t> ExternalControlClient::send_command(ApiCommand commandId, const std::vector<uint8_t> &payload) {
+  return pimpl_->send_command(commandId, payload);
+}
+
+void ExternalControlClient::send_bytes(const uint8_t *data, size_t len) {
+  pimpl_->send_bytes(data, len);
+}
+
+std::vector<uint8_t> ExternalControlClient::recv_response(ApiCommand expected_command) {
+  return pimpl_->recv_response(expected_command);
+}
+
+// Impl method implementations
+std::vector<uint8_t> ExternalControlClient::Impl::send_command(ApiCommand commandId, const std::vector<uint8_t> &payload) {
   // Build 7-byte header: 'R','E', command, data_size (4 bytes LE)
   uint8_t header[7];
   header[0] = static_cast<uint8_t>('R');
@@ -146,19 +146,19 @@ std::vector<uint8_t> ExternalControlClient::send_command(ApiCommand commandId, c
   return recv_response(commandId);
 }
 
-void ExternalControlClient::send_bytes(const uint8_t *data, size_t len) {
-  if (!pimpl_ || pimpl_->sock_fd < 0)
+void ExternalControlClient::Impl::send_bytes(const uint8_t *data, size_t len) {
+  if (sock_fd < 0)
     throw std::runtime_error("socket closed");
-  if (!write_all(pimpl_->sock_fd, data, len)) {
+  if (!write_all(sock_fd, data, len)) {
     throw std::runtime_error("send_bytes: write failed");
   }
 }
 
-std::vector<uint8_t> ExternalControlClient::recv_response(ApiCommand expected_command) {
-  if (!pimpl_ || pimpl_->sock_fd < 0)
+std::vector<uint8_t> ExternalControlClient::Impl::recv_response(ApiCommand expected_command) {
+  if (sock_fd < 0)
     throw std::runtime_error("socket closed");
 
-  int sock_fd = pimpl_->sock_fd;  // Local copy for lambda capture
+  // sock_fd is already a member variable, no need for local copy
 
   uint8_t return_code = 0;
   if (!read_all(sock_fd, &return_code, 1)) {

@@ -85,3 +85,6 @@ main/.qmlls.ini
 
 renodeAPI/src/control.cpp
 renodeAPI/include/control.h
+notes.txt
+renodeAPI/cAPI/renode_api.c
+renodeAPI/cAPI/renode_api.h

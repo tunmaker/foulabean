@@ -23,6 +23,11 @@ struct ExternalControlClient::Impl {
   std::map<std::string, std::weak_ptr<AMachine>> machines;
 
   Impl(const std::string &h, uint16_t p) : host(h), port(p) {}
+
+  // Protocol methods for peripheral classes to use
+  void send_bytes(const uint8_t *data, size_t len);
+  std::vector<uint8_t> recv_response(ApiCommand expected_command);
+  std::vector<uint8_t> send_command(ApiCommand commandId, const std::vector<uint8_t> &payload);
 };
 
 } // namespace renode

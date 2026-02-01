@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "renodeInterface.h"
+#include "renodeMachine.h"
 
 using namespace renode;
 
@@ -29,9 +30,52 @@ int main(int argc, char *argv[]) {
   }
 
   Error err;
-  renode->getMachine("stm32-machine", err);
-  std::cout << "code:" << err.code << ";message:" << err.message << '\n';
+  auto machine = renode->getMachine("stm32-machine", err);
+  std::cout << "getMachine - code:" << err.code << ";message:" << err.message << '\n';
 
+  if (machine) {
+    std::cout << "Machine acquired: " << machine->name() << '\n';
+
+    // Test GPIO operations
+    Error gpioErr;
+    auto gpio = machine->getGpio("sysbus.gpioPortA", gpioErr);
+
+    // Test GET_STATE on pin 0
+    GpioState state;
+
+    if (gpio) {
+      std::cout << "GPIO peripheral acquired\n";
+
+            // Test SET_STATE on pin 0 to High
+      Error setErr = gpio->setState(0, GpioState::High);
+      if (setErr) {
+        std::cout << "GPIO setState failed - code:" << setErr.code
+                  << " message:" << setErr.message << '\n';
+      } else {
+        std::cout << "GPIO pin 0 set to High\n";
+
+        // Read back to verify
+        Error readbackErr = gpio->getState(0, state);
+        if (!readbackErr) {
+          std::cout << "GPIO pin 0 readback state: " << static_cast<int>(state) << '\n';
+        }
+      }
+
+
+      Error stateErr = gpio->getState(0, state);
+      if (stateErr) {
+        std::cout << "GPIO getState failed - code:" << stateErr.code
+                  << " message:" << stateErr.message << '\n';
+      } else {
+        std::cout << "GPIO pin 0 state: " << static_cast<int>(state)
+                  << " (0=Low, 1=High, 2=HighZ)\n";
+      }
+
+    } else {
+      std::cout << "Failed to get GPIO - code:" << gpioErr.code
+                << " message:" << gpioErr.message << '\n';
+    }
+  }
 
   /*
       // Example: GetTime (no payload)

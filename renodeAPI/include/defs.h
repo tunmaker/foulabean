@@ -35,7 +35,7 @@ template <> struct Result<void> {
 using AdcValue = double;
 
 // GPIO state
-enum class GpioState : uint8_t { Low = 0, High = 1 };
+enum class GpioState : uint8_t { Low = 0, High = 1, HighZ = 2 };
 
 using GpioCallback = std::function<void(int pin, GpioState newState)>;
 
@@ -132,6 +132,13 @@ static void write_u32_le(std::vector<uint8_t> &buf, uint32_t v) {
   buf.push_back(uint8_t((v >> 8) & 0xFF));
   buf.push_back(uint8_t((v >> 16) & 0xFF));
   buf.push_back(uint8_t((v >> 24) & 0xFF));
+}
+
+// Serialize string with 4-byte LE length prefix + UTF-8 bytes (no null terminator)
+static void write_string(std::vector<uint8_t> &buf, const std::string &s) {
+  uint32_t len = static_cast<uint32_t>(s.size());
+  write_u32_le(buf, len);
+  buf.insert(buf.end(), s.begin(), s.end());
 }
 
 // Full-send helper

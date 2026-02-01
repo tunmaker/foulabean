@@ -14,6 +14,9 @@ struct AMachine::Impl {
 
   Impl(const std::string &n, ExternalControlClient::Impl *c)
       : name(n), renodeClient(c) {}
+
+  // Accessor for peripheral classes to get machine descriptor
+  int32_t getDescriptor() const noexcept { return descriptor; }
 };
 
 // Peripheral Impl definitions
@@ -27,6 +30,7 @@ struct Adc::Impl {
 struct Gpio::Impl {
   std::string path;
   AMachine::Impl *machine;
+  int32_t instanceId = -1;  // Renode peripheral instance ID from registration
   int nextCbHandle = 1;
   std::map<int, GpioCallback> callbacks;
 
@@ -163,9 +167,54 @@ std::shared_ptr<Gpio> AMachine::getGpio(const std::string &path, Error &err) noe
     return nullptr;
   }
 
-  auto impl = std::make_unique<Gpio::Impl>(path, pimpl_.get());
-  err = {0, ""};
-  return std::shared_ptr<Gpio>(new Gpio(std::move(impl)));
+  // Register the GPIO peripheral with Renode to get an instance ID
+  // Protocol (from renode_get_instance_descriptor):
+  //   data[0] = -1 (registration marker)
+  //   data[1] = machine->md (machine descriptor)
+  //   data[2] = name_length
+  //   data[3..] = name bytes
+  try {
+    std::vector<uint8_t> payload;
+
+    // Instance ID = -1 (registration request)
+    int32_t regId = -1;
+    auto regId_bytes = reinterpret_cast<const uint8_t*>(&regId);
+    payload.insert(payload.end(), regId_bytes, regId_bytes + sizeof(regId));
+
+    // Machine descriptor (required for registration)
+    int32_t machineDesc = pimpl_->descriptor;
+    auto md_bytes = reinterpret_cast<const uint8_t*>(&machineDesc);
+    payload.insert(payload.end(), md_bytes, md_bytes + sizeof(machineDesc));
+
+    // Peripheral path string (4-byte length + UTF-8 bytes)
+    write_string(payload, path);
+
+    // Send GPIO command for registration
+    std::vector<uint8_t> response = pimpl_->renodeClient->send_command(ApiCommand::GPIO, payload);
+
+    // Response should be 4 bytes: the assigned instance ID
+    if (response.size() != sizeof(int32_t)) {
+      err = {2, "Unexpected response size from GPIO registration"};
+      return nullptr;
+    }
+
+    int32_t instanceId = 0;
+    std::memcpy(&instanceId, response.data(), sizeof(instanceId));
+
+    if (instanceId < 0) {
+      err = {3, "GPIO registration failed: invalid instance ID"};
+      return nullptr;
+    }
+
+    auto impl = std::make_unique<Gpio::Impl>(path, pimpl_.get());
+    impl->instanceId = instanceId;
+    err = {0, ""};
+    return std::shared_ptr<Gpio>(new Gpio(std::move(impl)));
+
+  } catch (const std::exception &ex) {
+    err = {4, std::string("GPIO registration failed: ") + ex.what()};
+    return nullptr;
+  }
 }
 
 std::shared_ptr<SysBus> AMachine::getSysBus(const std::string &path, Error &err) noexcept {
@@ -292,21 +341,88 @@ Gpio::~Gpio() = default;
 
 Error Gpio::getState(int pin, GpioState &outState) noexcept {
   if (!pimpl_) return {1, "Invalid GPIO"};
-  // TODO: Query server for pin state
-  outState = GpioState::Low; // placeholder
-  return {0, ""};
+  if (!pimpl_->machine) return {2, "Invalid machine reference"};
+  if (pimpl_->instanceId < 0) return {2, "GPIO not registered"};
+
+  try {
+    // Build payload per Renode protocol:
+    // id (int32_t) + command (int8_t) + number (int32_t)
+    std::vector<uint8_t> payload;
+
+    // Instance ID (4 bytes LE) - obtained from registration
+    int32_t id = pimpl_->instanceId;
+    auto id_bytes = reinterpret_cast<const uint8_t*>(&id);
+    payload.insert(payload.end(), id_bytes, id_bytes + sizeof(id));
+
+    // Subcommand: 0 = GET_STATE (1 byte)
+    payload.push_back(0);
+
+    // Pin number (4 bytes LE)
+    int32_t pin_i32 = static_cast<int32_t>(pin);
+    auto pin_bytes = reinterpret_cast<const uint8_t*>(&pin_i32);
+    payload.insert(payload.end(), pin_bytes, pin_bytes + sizeof(pin_i32));
+
+    // Send command
+    std::vector<uint8_t> response = pimpl_->machine->renodeClient->send_command(ApiCommand::GPIO, payload);
+
+    // Parse response: 1 byte state value
+    if (response.size() != 1) {
+      return {3, "Unexpected response size from GPIO GET_STATE"};
+    }
+
+    uint8_t state_byte = response[0];
+    if (state_byte > 2) {
+      return {4, "Invalid GPIO state value from server"};
+    }
+
+    outState = static_cast<GpioState>(state_byte);
+    return {0, ""};
+
+  } catch (const std::exception &ex) {
+    return {5, std::string("GPIO getState failed: ") + ex.what()};
+  }
 }
 
 Error Gpio::setState(int pin, GpioState state) noexcept {
   if (!pimpl_) return {1, "Invalid GPIO"};
-  // TODO: Send SET_STATE command to server
+  if (!pimpl_->machine) return {2, "Invalid machine reference"};
+  if (pimpl_->instanceId < 0) return {2, "GPIO not registered"};
 
-  // Trigger callbacks for state change
-  for (auto &kv : pimpl_->callbacks) {
-    kv.second(pin, state);
+  try {
+    // Build payload per Renode protocol:
+    // id (int32_t) + command (int8_t) + number (int32_t) + state (uint8_t)
+    std::vector<uint8_t> payload;
+
+    // Instance ID (4 bytes LE) - obtained from registration
+    int32_t id = pimpl_->instanceId;
+    auto id_bytes = reinterpret_cast<const uint8_t*>(&id);
+    payload.insert(payload.end(), id_bytes, id_bytes + sizeof(id));
+
+    // Subcommand: 1 = SET_STATE (1 byte)
+    payload.push_back(1);
+
+    // Pin number (4 bytes LE)
+    int32_t pin_i32 = static_cast<int32_t>(pin);
+    auto pin_bytes = reinterpret_cast<const uint8_t*>(&pin_i32);
+    payload.insert(payload.end(), pin_bytes, pin_bytes + sizeof(pin_i32));
+
+    // State value (1 byte)
+    payload.push_back(static_cast<uint8_t>(state));
+
+    // Send command (expect SUCCESS_WITHOUT_DATA, empty response)
+    pimpl_->machine->renodeClient->send_command(ApiCommand::GPIO, payload);
+
+    // Trigger callbacks for state change (only after successful server update)
+    for (auto &kv : pimpl_->callbacks) {
+      kv.second(pin, state);
+    }
+
+    return {0, ""};
+
+  } catch (const std::exception &ex) {
+    // Don't trigger callbacks if command failed
+    return {5, std::string("GPIO setState failed: ") + ex.what()};
   }
-
-  return {0, ""};
 }
 
 Error Gpio::registerStateChangeCallback(GpioCallback cb, int &outHandle) noexcept {
