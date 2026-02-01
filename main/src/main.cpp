@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
   }
 
   Error err;
-  renode->getMachine("test-machine", err);
+  renode->getMachine("stm32-machine", err);
   std::cout << "code:" << err.code << ";message:" << err.message << '\n';
 
 

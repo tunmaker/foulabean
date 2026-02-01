@@ -7,10 +7,13 @@ find_package(cppzmq REQUIRED)
 
 set(MODULE_PUBLIC_HEADERS
     include/renodeInterface.h
+    include/renodeMachine.h
+    include/defs.h
 )
 
 set(MODULE_SOURCES
     src/renodeInterface.cpp
+    src/renodeMachine.cpp
 )
 
 # --- common reuse logic (no changes below) ---

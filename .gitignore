@@ -82,3 +82,6 @@ CMakeLists.txt.user*
 /build*/
 ../build*/
 main/.qmlls.ini
+
+renodeAPI/src/control.cpp
+renodeAPI/include/control.h

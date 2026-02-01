@@ -1,5 +1,6 @@
-// renodeInterca.cpp
+// renodeInterface.cpp
 #include "renodeInterface.h"
+#include "renodeMachine.h"
 #include "defs.h"
 
 #include <arpa/inet.h>
@@ -17,18 +18,21 @@
 #include <iostream>
 #include <stdexcept>
 #include <vector>
+#include <map>
 
 namespace renode {
 
-// Implementation details (socket, protocol) hidden here.
+// ExternalControlClient::Impl definition
 struct ExternalControlClient::Impl {
   std::string host;
   uint16_t port;
+  int sock_fd = -1;  // Socket file descriptor
   bool connected = false;
   std::mutex mtx;
 
-  // Simulated resources for the example:
-  std::map<std::string, std::weak_ptr<renode::AMachine>> machines;
+  // Cache of machines
+  std::map<std::string, std::weak_ptr<AMachine>> machines;
+
   Impl(const std::string &h, uint16_t p) : host(h), port(p) {}
 };
 
@@ -50,24 +54,21 @@ ExternalControlClient::connect(const std::string &host, uint16_t port) {
   }
 
   for (struct addrinfo *ai = res; ai != nullptr; ai = ai->ai_next) {
-    sock_fd_ = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-    if (sock_fd_ < 0)
+    impl->sock_fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+    if (impl->sock_fd < 0)
       continue;
-    if (::connect(sock_fd_, ai->ai_addr, ai->ai_addrlen) == 0) {
+    if (::connect(impl->sock_fd, ai->ai_addr, ai->ai_addrlen) == 0) {
       impl->connected = true;
+      freeaddrinfo(res);
       return std::unique_ptr<ExternalControlClient>(
           new ExternalControlClient(std::move(impl)));
-      break; // connected
     }
-    close(sock_fd_);
-    sock_fd_ = -1;
+    close(impl->sock_fd);
+    impl->sock_fd = -1;
   }
 
   freeaddrinfo(res);
-
-  if (sock_fd_ < 0) {
-    throw std::runtime_error("ExternalControlClient: unable to connect");
-  }
+  throw std::runtime_error("ExternalControlClient: unable to connect");
 
   // ToDo query server for machines, but we need handshake first ?
   return nullptr;
@@ -79,11 +80,13 @@ ExternalControlClient::ExternalControlClient(
 ExternalControlClient::~ExternalControlClient() { disconnect(); }
 
 void ExternalControlClient::disconnect() noexcept {
-  if (sock_fd_ >= 0) {
-    close(sock_fd_);
-    sock_fd_ = -1;
+  if (!pimpl_) return;
+  if (pimpl_->sock_fd >= 0) {
+    close(pimpl_->sock_fd);
+    pimpl_->sock_fd = -1;
     std::cout << "disconnected cleanly." << '\n';
   }
+  pimpl_->connected = false;
 }
 
 bool ExternalControlClient::performHandshake() {
@@ -100,7 +103,7 @@ bool ExternalControlClient::performHandshake() {
 
   // Read single-byte server response for handshake
   uint8_t response = 0;
-  if (!read_byte(sock_fd_, response)) {
+  if (!read_byte(pimpl_->sock_fd, response)) {
     std::cerr << "handshake: failed to read handshake response\n";
     return false;
   }
@@ -144,19 +147,21 @@ std::vector<uint8_t> ExternalControlClient::send_command(ApiCommand commandId, c
 }
 
 void ExternalControlClient::send_bytes(const uint8_t *data, size_t len) {
-  if (sock_fd_ < 0)
+  if (!pimpl_ || pimpl_->sock_fd < 0)
     throw std::runtime_error("socket closed");
-  if (!write_all(sock_fd_, data, len)) {
+  if (!write_all(pimpl_->sock_fd, data, len)) {
     throw std::runtime_error("send_bytes: write failed");
   }
 }
 
 std::vector<uint8_t> ExternalControlClient::recv_response(ApiCommand expected_command) {
-  if (sock_fd_ < 0)
+  if (!pimpl_ || pimpl_->sock_fd < 0)
     throw std::runtime_error("socket closed");
 
+  int sock_fd = pimpl_->sock_fd;  // Local copy for lambda capture
+
   uint8_t return_code = 0;
-  if (!read_all(sock_fd_, &return_code, 1)) {
+  if (!read_all(sock_fd, &return_code, 1)) {
     throw std::runtime_error("recv_response: failed to read return code");
   }
 
@@ -164,7 +169,7 @@ std::vector<uint8_t> ExternalControlClient::recv_response(ApiCommand expected_co
   // For many codes we read the echoed command
   if (return_code == COMMAND_FAILED || return_code == INVALID_COMMAND ||
       return_code == SUCCESS_WITH_DATA || return_code == SUCCESS_WITHOUT_DATA) {
-    if (!read_all(sock_fd_, &received_command, 1)) {
+    if (!read_all(sock_fd, &received_command, 1)) {
       throw std::runtime_error("recv_response: failed to read echoed command");
     }
   }
@@ -174,7 +179,7 @@ std::vector<uint8_t> ExternalControlClient::recv_response(ApiCommand expected_co
 
   auto safe_read_size = [&](uint32_t &out_size) -> bool {
     uint8_t sizebuf[4];
-    if (!read_all(sock_fd_, sizebuf, 4))
+    if (!read_all(sock_fd, sizebuf, 4))
       return false;
     out_size = uint32_t(sizebuf[0]) | (uint32_t(sizebuf[1]) << 8) |
                (uint32_t(sizebuf[2]) << 16) | (uint32_t(sizebuf[3]) << 24);
@@ -193,7 +198,7 @@ std::vector<uint8_t> ExternalControlClient::recv_response(ApiCommand expected_co
     }
     if (data_size) {
       payload.resize(data_size);
-      if (!read_all(sock_fd_, payload.data(), data_size)) {
+      if (!read_all(sock_fd, payload.data(), data_size)) {
         std::cerr << "recv_response: truncated payload (expected " << data_size
                   << " bytes)\n";
         return {};
@@ -237,6 +242,8 @@ std::string ExternalControlClient::bytes_to_string(const std::vector<uint8_t> &v
   return s;
 }
 
-
+// Move constructors implementation
+ExternalControlClient::ExternalControlClient(ExternalControlClient&& other) noexcept = default;
+ExternalControlClient& ExternalControlClient::operator=(ExternalControlClient&&) noexcept = default;
 
 } // namespace renode

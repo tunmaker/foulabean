@@ -2,12 +2,16 @@
 
 #include <string>
 #include <optional>
+#include <memory>
+#include <future>
+#include <vector>
 
 #include "defs.h"
-#include "renodeInterface.h"
 
 namespace renode {
 
+// Forward declarations
+class ExternalControlClient;
 class Adc;
 class Gpio;
 class SysBus;

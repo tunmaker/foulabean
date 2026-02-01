@@ -9,17 +9,17 @@
 #include <vector>
 
 #include "defs.h"
-#include "renodeMachine.h"
 
 namespace renode {
+
+// Forward declarations
+class AMachine;
 
 // Fatal exception for unrecoverable errors
 class RenodeException : public std::runtime_error {
 public:
   explicit RenodeException(const std::string &msg) : std::runtime_error(msg) {}
 };
-
-static int sock_fd_;
 
 class ExternalControlClient {
 public:
