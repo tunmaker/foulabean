@@ -1,0 +1,14 @@
+:name: TEST-MACHINE  
+:description: Simple ARM platform for External Control API testing  
+  
+# Create a simple machine  
+mach create "test-machine"  
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl  
+  
+# Start the External Control Server for API access  
+emulation CreateExternalControlServer "api-server" 5555  
+  
+# Load a simple binary  
+sysbus LoadELF @https://dl.antmicro.com/projects/renode/nucleo_h743zi--zephyr-hello_world.elf-s_22976-5d4750c0b0b6e5b8e8b5e5e5e5e5e5e5e5e5e5e  
+  
+start

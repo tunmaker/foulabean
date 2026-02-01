@@ -11,6 +11,26 @@
 #define SERVER_START_COMMAND "emulation CreateExternalControlServer \"NAME\" PORT"
 namespace renode{
 
+// Lightweight recoverable error object (returned by methods that don't throw)
+struct Error {
+  int code = 0;
+  std::string message;
+  explicit operator bool() const noexcept { return code != 0; }
+};
+
+// Result<T>: simple non-throwing holder for value + Error
+template <typename T> struct Result {
+  T value;
+  Error error;
+  explicit operator bool() const noexcept { return !error; }
+};
+
+// Void specialization
+template <> struct Result<void> {
+  Error error;
+  explicit operator bool() const noexcept { return !error; }
+};
+
 // ADC channel value type
 using AdcValue = double;
 

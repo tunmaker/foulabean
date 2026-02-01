@@ -1,6 +1,7 @@
 {
     "recommendations": [
         "theqtcompany.qt-cpp-pack",
-        "ms-vscode.cpptools-themes"
+        "ms-vscode.cpptools-themes",
+        "anthropic.claude-code"
     ]
 }
