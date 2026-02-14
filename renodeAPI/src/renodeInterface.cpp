@@ -94,6 +94,10 @@ std::unique_ptr<RenodeProcess> RenodeProcess::launch(const RenodeConfig &config)
   if (config.disable_gui) {
     args_storage.push_back("--disable-gui");
   }
+  if (config.monitor_port > 0) {
+    args_storage.push_back("--port");
+    args_storage.push_back(std::to_string(config.monitor_port));
+  }
   if (!config.script_path.empty()) {
     args_storage.push_back(config.script_path);
   }
@@ -148,7 +152,7 @@ std::unique_ptr<RenodeProcess> RenodeProcess::launch(const RenodeConfig &config)
       return nullptr;
     }
 
-    // Try to connect to the port
+    // Try to connect to the external control port
     int test_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (test_fd >= 0) {
       struct sockaddr_in addr{};
@@ -158,10 +162,25 @@ std::unique_ptr<RenodeProcess> RenodeProcess::launch(const RenodeConfig &config)
 
       if (::connect(test_fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0) {
         close(test_fd);
-        std::cout << "RenodeProcess: Renode started successfully (pid=" << pid << ")\n";
-        return process;
+
+        // Also check monitor port if configured
+        bool monitor_ready = true;
+        if (config.monitor_port > 0) {
+          int mon_fd = socket(AF_INET, SOCK_STREAM, 0);
+          if (mon_fd >= 0) {
+            addr.sin_port = htons(config.monitor_port);
+            monitor_ready = (::connect(mon_fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == 0);
+            close(mon_fd);
+          }
+        }
+
+        if (monitor_ready) {
+          std::cout << "RenodeProcess: Renode started successfully (pid=" << pid << ")\n";
+          return process;
+        }
+      } else {
+        close(test_fd);
       }
-      close(test_fd);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -201,20 +220,9 @@ ExternalControlClient::launchAndConnect(const RenodeConfig &config) {
       impl->connected = true;
       freeaddrinfo(res);
 
-      // Optionally connect to monitor socket
-      std::unique_ptr<Monitor> monitor;
-      if (config.monitor_port > 0) {
-        try {
-          monitor = Monitor::connect(config.host, config.monitor_port);
-          std::cout << "Monitor connected on port " << config.monitor_port << "\n";
-        } catch (const std::exception &e) {
-          std::cerr << "Warning: Could not connect to monitor: " << e.what() << "\n";
-          // Continue without monitor
-        }
-      }
-
+      // Return client without monitor - connectMonitor() should be called after handshake
       return std::unique_ptr<ExternalControlClient>(
-          new ExternalControlClient(std::move(impl), std::move(process), std::move(monitor)));
+          new ExternalControlClient(std::move(impl), std::move(process), nullptr));
     }
     close(impl->sock_fd);
     impl->sock_fd = -1;
@@ -294,6 +302,23 @@ void ExternalControlClient::disconnect() noexcept {
 
 Monitor* ExternalControlClient::getMonitor() noexcept {
   return monitor_.get();
+}
+
+bool ExternalControlClient::connectMonitor(const std::string &host, uint16_t port) {
+  if (monitor_) {
+    return true;  // Already connected
+  }
+
+  try {
+    monitor_ = Monitor::connect(host, port);
+    if (pimpl_ && monitor_) {
+      pimpl_->monitor = monitor_.get();
+    }
+    return true;
+  } catch (const std::exception &e) {
+    std::cerr << "Failed to connect to monitor: " << e.what() << "\n";
+    return false;
+  }
 }
 
 bool ExternalControlClient::performHandshake() {
@@ -507,26 +532,43 @@ struct Monitor::Impl {
     }
   }
 
-  // Read until we get the monitor prompt "(monitor)"
+  // Read until we get a monitor prompt like "(monitor) " or "(machine-name) "
   std::string readUntilPrompt() {
     std::string result;
     char buf[256];
-    const std::string prompt = "(monitor)";
 
+    // std::cerr << "[Monitor] readUntilPrompt: waiting for data...\n";
     while (true) {
       ssize_t n = recv(sock_fd, buf, sizeof(buf) - 1, 0);
-      if (n <= 0) break;
-      buf[n] = '\0';
-      result += buf;
-
-      // Check if we've received the prompt
-      if (result.size() >= prompt.size() &&
-          result.substr(result.size() - prompt.size()) == prompt) {
-        // Remove the prompt from output
-        result = result.substr(0, result.size() - prompt.size());
+      if (n <= 0) {
+        std::cerr << "[Monitor] recv returned " << n << " (errno=" << errno << ")\n";
         break;
       }
+      buf[n] = '\0';
+      result += buf;
+      // std::cerr << "[Monitor] received " << n << " bytes, total=" << result.size()
+      //           << ", last chars: \"" << result.substr(result.size() > 20 ? result.size() - 20 : 0) << "\"\n";
+
+      // Check if we've received a prompt pattern: (something) followed by space
+      // The prompt often has trailing space and may have ANSI codes
+      // Look for ") " pattern near the end of the buffer
+      size_t promptMarker = result.rfind(") ");
+      if (promptMarker != std::string::npos) {
+        // Found ") ", now find the matching "("
+        size_t openPos = result.rfind('(', promptMarker);
+        if (openPos != std::string::npos && promptMarker > openPos) {
+          // std::cerr << "[Monitor] found prompt at pos " << openPos << " to " << promptMarker << "\n";
+          // Remove the prompt (and any ANSI codes before it) from output
+          // Find the start of the line containing the prompt
+          size_t lineStart = result.rfind('\n', openPos);
+          if (lineStart == std::string::npos) lineStart = 0;
+          else lineStart++; // Skip the newline itself
+          result = result.substr(0, lineStart);
+          break;
+        }
+      }
     }
+    // std::cerr << "[Monitor] readUntilPrompt done, result length=" << result.size() << "\n";
     return result;
   }
 

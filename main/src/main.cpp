@@ -67,6 +67,42 @@ int main(int argc, char *argv[]) {
   }
 
   // =========================================================================
+  // CONNECT MONITOR (after handshake)
+  // =========================================================================
+  printSeparator("CONNECT MONITOR");
+
+  if (client->connectMonitor("127.0.0.1", config.monitor_port)) {
+    std::cout << "Monitor connected on port " << config.monitor_port << "\n";
+  } else {
+    std::cerr << "Warning: Monitor connection failed, some features unavailable\n";
+  }
+
+  // =========================================================================
+  // MONITOR COMMANDS (direct access)
+  // =========================================================================
+  printSeparator("MONITOR COMMANDS");
+
+  Monitor* monitor = client->getMonitor();
+  if (monitor) {
+    std::cout << "Monitor connection available\n";
+
+    // Execute custom command
+    auto result = monitor->execute("version");
+    if (!result.error) {
+      std::cout << "Renode version: " << result.value << '\n';
+    }
+
+    // Query emulation state
+    result = monitor->execute("emulation IsStarted");
+    if (!result.error) {
+      std::cout << "Emulation started: " << result.value << '\n';
+    }
+
+  } else {
+    std::cout << "No monitor connection available\n";
+  }
+
+  // =========================================================================
   // GET MACHINE
   // =========================================================================
   printSeparator("GET MACHINE");
@@ -279,31 +315,6 @@ int main(int argc, char *argv[]) {
 
   } else {
     std::cerr << "Failed to get SysBus: " << busErr.message << '\n';
-  }
-
-  // =========================================================================
-  // MONITOR COMMANDS (direct access)
-  // =========================================================================
-  printSeparator("MONITOR COMMANDS");
-
-  Monitor* monitor = client->getMonitor();
-  if (monitor) {
-    std::cout << "Monitor connection available\n";
-
-    // Execute custom command
-    auto result = monitor->execute("version");
-    if (!result.error) {
-      std::cout << "Renode version: " << result.value << '\n';
-    }
-
-    // Query emulation state
-    result = monitor->execute("emulation IsStarted");
-    if (!result.error) {
-      std::cout << "Emulation started: " << result.value << '\n';
-    }
-
-  } else {
-    std::cout << "No monitor connection available\n";
   }
 
   // =========================================================================

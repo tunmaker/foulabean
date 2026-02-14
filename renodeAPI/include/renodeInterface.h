@@ -24,8 +24,8 @@ struct RenodeConfig {
   std::string host = "127.0.0.1";  // Host to connect to
   uint16_t port = 5555;            // External control port
   uint16_t monitor_port = 5556;    // Monitor telnet port (0 to disable)
-  bool console_mode = true;        // --console flag
-  bool disable_gui = true;         // --disable-gui flag
+  bool console_mode = false;        // --console flag
+  bool disable_gui = false;         // --disable-gui flag
   int startup_timeout_ms = 10000;  // Max time to wait for Renode to start
 };
 
@@ -97,6 +97,9 @@ public:
 
   // Get the Monitor connection (if available). Returns nullptr if not connected.
   Monitor* getMonitor() noexcept;
+
+  // Connect to monitor socket (call after handshake succeeds)
+  bool connectMonitor(const std::string &host = "127.0.0.1", uint16_t port = 5556);
 
   // *Handshake: vector of (commandId, version)
   bool performHandshake();
