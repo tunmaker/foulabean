@@ -7,9 +7,12 @@ logLevel 0
 mach create "stm32-machine"  
 machine LoadPlatformDescription @platforms/cpus/stm32f4.repl  
 
-# Start the External Control Server for API access  
-emulation CreateExternalControlServer "api-server" 5555  
-  
-# Load a simple binary  
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+# Expose monitor on telnet socket for command execution
+emulation CreateServerSocketTerminal 5556 "monitor-socket" true
+
+# Load a simple binary
 sysbus LoadELF @https://dl.antmicro.com/projects/renode/stm32f4discovery.elf-s_445441-827a0dedd3790f4559d7518320006613768b5e72
-start 
+start

@@ -123,8 +123,11 @@ public:
   Error getState(int pin, GpioState &outState) noexcept;
   Error setState(int pin, GpioState state) noexcept;
 
-  // Register callback; returns a handle id to later unregister. Callback
-  // invoked on state change.
+  // Register callback for specific pin; returns a handle id to later unregister.
+  // Callback invoked on state change. This registers with Renode server for async events.
+  Error registerStateChangeCallback(int pin, GpioCallback cb, int &outHandle) noexcept;
+
+  // Legacy overload (local-only callback, not registered with server)
   Error registerStateChangeCallback(GpioCallback cb, int &outHandle) noexcept;
   Error unregisterStateChangeCallback(int handle) noexcept;
 

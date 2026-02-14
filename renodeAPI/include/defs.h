@@ -134,6 +134,32 @@ static void write_u32_le(std::vector<uint8_t> &buf, uint32_t v) {
   buf.push_back(uint8_t((v >> 24) & 0xFF));
 }
 
+static void write_u64_le(std::vector<uint8_t> &buf, uint64_t v) {
+  for (int i = 0; i < 8; ++i) {
+    buf.push_back(static_cast<uint8_t>((v >> (i * 8)) & 0xFF));
+  }
+}
+
+static void write_i32_le(std::vector<uint8_t> &buf, int32_t v) {
+  write_u32_le(buf, static_cast<uint32_t>(v));
+}
+
+// Read helpers for parsing responses
+static uint32_t read_u32_le(const uint8_t *buf) {
+  return static_cast<uint32_t>(buf[0]) |
+         (static_cast<uint32_t>(buf[1]) << 8) |
+         (static_cast<uint32_t>(buf[2]) << 16) |
+         (static_cast<uint32_t>(buf[3]) << 24);
+}
+
+static uint64_t read_u64_le(const uint8_t *buf) {
+  uint64_t result = 0;
+  for (int i = 0; i < 8; ++i) {
+    result |= static_cast<uint64_t>(buf[i]) << (i * 8);
+  }
+  return result;
+}
+
 // Serialize string with 4-byte LE length prefix + UTF-8 bytes (no null terminator)
 static void write_string(std::vector<uint8_t> &buf, const std::string &s) {
   uint32_t len = static_cast<uint32_t>(s.size());
