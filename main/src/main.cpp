@@ -29,8 +29,8 @@ int main(int argc, char *argv[]) {
   printSeparator("AUTO-LAUNCH RENODE");
 
   RenodeConfig config;
-  config.renode_path = "~/packages/renode_portable/renode";
-  config.script_path = "~/projects/digitwin/src/renodeAPI/renodeTestScripts/test-machine.resc";
+  config.renode_path = "/home/tunmaker/packages/renode_portable/renode";
+  config.script_path = "/home/tunmaker/projects/digitwin/src/renodeAPI/renodeTestScripts/test-machine.resc";
   config.port = 5555;
   config.monitor_port = 5556;
   config.startup_timeout_ms = 15000;
