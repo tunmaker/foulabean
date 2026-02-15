@@ -1,0 +1,316 @@
+#include "SimulationController.h"
+#include "GpioModel.h"
+#include "AdcModel.h"
+#include "RenodeWorker.h"
+
+SimulationController::SimulationController(QObject *parent)
+    : QObject(parent)
+    , m_gpioModel(new GpioModel(this))
+    , m_adcModel(new AdcModel(this))
+    , m_worker(new RenodeWorker) // no parent — will be moved to thread
+{
+    m_worker->moveToThread(&m_workerThread);
+    connect(&m_workerThread, &QThread::finished,
+            m_worker, &QObject::deleteLater);
+    setupWorkerConnections();
+    m_workerThread.start();
+}
+
+SimulationController::~SimulationController() {
+    m_workerThread.quit();
+    m_workerThread.wait();
+}
+
+// --- Property getters ---
+
+bool SimulationController::connected() const { return m_connected; }
+bool SimulationController::connecting() const { return m_connecting; }
+QString SimulationController::connectionError() const { return m_connectionError; }
+QString SimulationController::machineName() const { return m_machineName; }
+QString SimulationController::machineId() const { return m_machineId; }
+bool SimulationController::running() const { return m_running; }
+quint64 SimulationController::simulationTimeUs() const { return m_simulationTimeUs; }
+
+QString SimulationController::simulationTimeFormatted() const {
+    if (m_simulationTimeUs == 0)
+        return QStringLiteral("0.000 ms");
+
+    if (m_simulationTimeUs < 1000)
+        return QString::number(m_simulationTimeUs) + QStringLiteral(" us");
+
+    if (m_simulationTimeUs < 1000000) {
+        double ms = static_cast<double>(m_simulationTimeUs) / 1000.0;
+        return QString::number(ms, 'f', 3) + QStringLiteral(" ms");
+    }
+
+    double s = static_cast<double>(m_simulationTimeUs) / 1000000.0;
+    return QString::number(s, 'f', 6) + QStringLiteral(" s");
+}
+
+GpioModel *SimulationController::gpioModel() const { return m_gpioModel; }
+AdcModel *SimulationController::adcModel() const { return m_adcModel; }
+int SimulationController::gpioPinCount() const { return m_gpioPinCount; }
+QString SimulationController::gpioPath() const { return m_gpioPath; }
+QString SimulationController::adcPath() const { return m_adcPath; }
+
+// --- Property setters (configurable params) ---
+
+void SimulationController::setGpioPinCount(int count) {
+    if (m_gpioPinCount == count) return;
+    m_gpioPinCount = count;
+    emit gpioPinCountChanged();
+}
+
+void SimulationController::setGpioPath(const QString &path) {
+    if (m_gpioPath == path) return;
+    m_gpioPath = path;
+    emit gpioPathChanged();
+}
+
+void SimulationController::setAdcPath(const QString &path) {
+    if (m_adcPath == path) return;
+    m_adcPath = path;
+    emit adcPathChanged();
+}
+
+// --- Q_INVOKABLE actions ---
+
+void SimulationController::connectToRenode(const QString &renodePath,
+                                            const QString &scriptPath,
+                                            const QString &host,
+                                            int port, int monitorPort,
+                                            int timeoutMs,
+                                            const QString &machineName) {
+    if (m_connecting || m_connected) return;
+
+    m_connecting = true;
+    emit connectingChanged();
+    m_connectionError.clear();
+    emit connectionErrorChanged();
+
+    emit requestConnect(renodePath, scriptPath, host, port,
+                        monitorPort, timeoutMs, machineName);
+}
+
+void SimulationController::disconnect() {
+    if (!m_connected && !m_connecting) return;
+    emit requestDisconnect();
+}
+
+void SimulationController::runFor(quint64 durationMs) {
+    if (!m_connected) return;
+    // TimeUnit::TU_MILLISECONDS = 1000
+    emit requestRunFor(durationMs, 1000);
+}
+
+void SimulationController::pause() {
+    if (!m_connected || !m_running) return;
+    emit requestPause();
+}
+
+void SimulationController::resume() {
+    if (!m_connected || m_running) return;
+    emit requestResume();
+}
+
+void SimulationController::reset() {
+    if (!m_connected) return;
+    emit requestReset();
+}
+
+void SimulationController::setGpioPin(int pin, int state) {
+    if (!m_connected) return;
+    emit requestSetGpioPin(m_gpioPath, pin, state);
+}
+
+void SimulationController::setAdcChannel(int channel, double value) {
+    if (!m_connected) return;
+    emit requestSetAdcChannel(m_adcPath, channel, value);
+}
+
+void SimulationController::refreshPeripherals() {
+    if (!m_connected) return;
+    emit requestRefreshGpio(m_gpioPath, m_gpioPinCount);
+    emit requestRefreshAdc(m_adcPath);
+    emit requestGetTime();
+}
+
+// --- Worker result slots ---
+
+void SimulationController::onConnected(QString machineName, QString machineId) {
+    m_connecting = false;
+    emit connectingChanged();
+
+    m_connected = true;
+    emit connectedChanged();
+
+    if (m_machineName != machineName) {
+        m_machineName = machineName;
+        emit machineNameChanged();
+    }
+    if (m_machineId != machineId) {
+        m_machineId = machineId;
+        emit machineIdChanged();
+    }
+
+    m_running = true;
+    emit runningChanged();
+
+    // Fetch initial peripheral data
+    refreshPeripherals();
+}
+
+void SimulationController::onConnectionFailed(QString errorMessage) {
+    m_connecting = false;
+    emit connectingChanged();
+
+    if (m_connectionError != errorMessage) {
+        m_connectionError = errorMessage;
+        emit connectionErrorChanged();
+    }
+}
+
+void SimulationController::onDisconnected() {
+    m_connecting = false;
+    emit connectingChanged();
+
+    if (m_connected) {
+        m_connected = false;
+        emit connectedChanged();
+    }
+    if (m_running) {
+        m_running = false;
+        emit runningChanged();
+    }
+
+    m_machineName.clear();
+    emit machineNameChanged();
+    m_machineId.clear();
+    emit machineIdChanged();
+    m_simulationTimeUs = 0;
+    emit simulationTimeUsChanged();
+
+    m_gpioModel->resetPins({});
+    m_adcModel->resetChannels(0, {});
+}
+
+void SimulationController::onSimulationTimeUpdated(quint64 timeMicroseconds) {
+    if (m_simulationTimeUs == timeMicroseconds) return;
+    m_simulationTimeUs = timeMicroseconds;
+    emit simulationTimeUsChanged();
+}
+
+void SimulationController::onRunForCompleted() {
+    // Time is already updated via onSimulationTimeUpdated
+}
+
+void SimulationController::onRunForFailed(QString errorMessage) {
+    if (m_connectionError != errorMessage) {
+        m_connectionError = errorMessage;
+        emit connectionErrorChanged();
+    }
+}
+
+void SimulationController::onPaused() {
+    if (m_running) {
+        m_running = false;
+        emit runningChanged();
+    }
+}
+
+void SimulationController::onResumed() {
+    if (!m_running) {
+        m_running = true;
+        emit runningChanged();
+    }
+}
+
+void SimulationController::onResetDone() {
+    m_simulationTimeUs = 0;
+    emit simulationTimeUsChanged();
+    refreshPeripherals();
+}
+
+void SimulationController::onOperationFailed(QString operation,
+                                              QString errorMessage) {
+    Q_UNUSED(operation)
+    if (m_connectionError != errorMessage) {
+        m_connectionError = errorMessage;
+        emit connectionErrorChanged();
+    }
+}
+
+void SimulationController::onGpioStatesUpdated(QString peripheralPath,
+                                                QVector<GpioPinData> pins) {
+    Q_UNUSED(peripheralPath)
+    m_gpioModel->resetPins(pins);
+}
+
+void SimulationController::onGpioPinChanged(QString peripheralPath,
+                                             int pin, int newState) {
+    Q_UNUSED(peripheralPath)
+    m_gpioModel->updatePin(pin, newState);
+}
+
+void SimulationController::onAdcDataUpdated(QString peripheralPath,
+                                             int channelCount,
+                                             QVector<AdcChannelData> channels) {
+    Q_UNUSED(peripheralPath)
+    m_adcModel->resetChannels(channelCount, channels);
+}
+
+// --- Internal setup ---
+
+void SimulationController::setupWorkerConnections() {
+    // Commands: controller -> worker (auto-queued across threads)
+    connect(this, &SimulationController::requestConnect,
+            m_worker, &RenodeWorker::doConnect);
+    connect(this, &SimulationController::requestDisconnect,
+            m_worker, &RenodeWorker::doDisconnect);
+    connect(this, &SimulationController::requestRunFor,
+            m_worker, &RenodeWorker::doRunFor);
+    connect(this, &SimulationController::requestPause,
+            m_worker, &RenodeWorker::doPause);
+    connect(this, &SimulationController::requestResume,
+            m_worker, &RenodeWorker::doResume);
+    connect(this, &SimulationController::requestReset,
+            m_worker, &RenodeWorker::doReset);
+    connect(this, &SimulationController::requestRefreshGpio,
+            m_worker, &RenodeWorker::doRefreshGpio);
+    connect(this, &SimulationController::requestSetGpioPin,
+            m_worker, &RenodeWorker::doSetGpioPin);
+    connect(this, &SimulationController::requestRefreshAdc,
+            m_worker, &RenodeWorker::doRefreshAdc);
+    connect(this, &SimulationController::requestSetAdcChannel,
+            m_worker, &RenodeWorker::doSetAdcChannel);
+    connect(this, &SimulationController::requestGetTime,
+            m_worker, &RenodeWorker::doGetTime);
+
+    // Results: worker -> controller (auto-queued across threads)
+    connect(m_worker, &RenodeWorker::connected,
+            this, &SimulationController::onConnected);
+    connect(m_worker, &RenodeWorker::connectionFailed,
+            this, &SimulationController::onConnectionFailed);
+    connect(m_worker, &RenodeWorker::disconnected,
+            this, &SimulationController::onDisconnected);
+    connect(m_worker, &RenodeWorker::simulationTimeUpdated,
+            this, &SimulationController::onSimulationTimeUpdated);
+    connect(m_worker, &RenodeWorker::runForCompleted,
+            this, &SimulationController::onRunForCompleted);
+    connect(m_worker, &RenodeWorker::runForFailed,
+            this, &SimulationController::onRunForFailed);
+    connect(m_worker, &RenodeWorker::paused,
+            this, &SimulationController::onPaused);
+    connect(m_worker, &RenodeWorker::resumed,
+            this, &SimulationController::onResumed);
+    connect(m_worker, &RenodeWorker::resetDone,
+            this, &SimulationController::onResetDone);
+    connect(m_worker, &RenodeWorker::operationFailed,
+            this, &SimulationController::onOperationFailed);
+    connect(m_worker, &RenodeWorker::gpioStatesUpdated,
+            this, &SimulationController::onGpioStatesUpdated);
+    connect(m_worker, &RenodeWorker::gpioPinChanged,
+            this, &SimulationController::onGpioPinChanged);
+    connect(m_worker, &RenodeWorker::adcDataUpdated,
+            this, &SimulationController::onAdcDataUpdated);
+}

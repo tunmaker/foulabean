@@ -1,4 +1,4 @@
-#src/main/CMAkeLists.txt
+#src/main/CMakeLists.txt
 
 set(TARGET_NAME appdigitwin)
 
@@ -6,21 +6,17 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Quick)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
-set(MAIN_PUBLIC_HEADERS
-    #include/main/app.hpp
-)
-set(MAIN_SOURCES
-    src/main.cpp
-    #rc/app.cpp
-)
-
 set(MAIN_QML
     qml/Main.qml
 )
 
 qt_add_executable(${TARGET_NAME}
-    ${MAIN_SOURCES}
-    ${MAIN_PUBLIC_HEADERS}
+    src/main.cpp
+    src/BridgeTypes.h
+    src/RenodeWorker.h src/RenodeWorker.cpp
+    src/GpioModel.h src/GpioModel.cpp
+    src/AdcModel.h src/AdcModel.cpp
+    src/SimulationController.h src/SimulationController.cpp
 )
 
 qt_add_qml_module(${TARGET_NAME}
@@ -28,6 +24,10 @@ qt_add_qml_module(${TARGET_NAME}
     VERSION 1.0
     QML_FILES
         ${MAIN_QML}
+    SOURCES
+        src/SimulationController.h src/SimulationController.cpp
+        src/GpioModel.h src/GpioModel.cpp
+        src/AdcModel.h src/AdcModel.cpp
 )
 
 set_target_properties(${TARGET_NAME} PROPERTIES
@@ -37,19 +37,14 @@ set_target_properties(${TARGET_NAME} PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
+target_include_directories(${TARGET_NAME}
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
 target_link_libraries(${TARGET_NAME}
     PRIVATE Qt6::Quick
     PRIVATE renodeAPI::renodeAPI
 )
-
-#target_sources(${TARGET_NAME}
-#    PRIVATE ${MAIN_SOURCES}
-#    PUBLIC  ${MAIN_PUBLIC_HEADERS}
-#)
-#
-#target_include_directories(${TARGET_NAME} PRIVATE
-#    ${CMAKE_CURRENT_SOURCE_DIR}/include
-#)
 
 include(GNUInstallDirs)
 install(TARGETS ${TARGET_NAME}
