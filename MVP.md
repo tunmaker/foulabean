@@ -10,11 +10,11 @@
 | Section | Progress | Status |
 |---------|----------|--------|
 | 1. Core Simulation Engine | 7/12 | In Progress |
-| 2. Backend-GUI Bridge | 0/5 | Not Started |
+| 2. Backend-GUI Bridge | 5/5 | Complete |
 | 3. Qt GUI & Live Dashboard | 1/8 | Not Started |
 | 4. Data Handling & Import/Export | 0/3 | Not Started |
 | 5. Headless CLI & CI | 0/3 | Not Started |
-| 6. Security & Performance | 2/4 | In Progress |
+| 6. Security & Performance | 3/4 | In Progress |
 | 7. Extensibility | 1/3 | In Progress |
 
 ---
@@ -46,15 +46,15 @@
 
 ---
 
-### **2. Backend-GUI Bridge (High Priority — do next)**
+### **2. Backend-GUI Bridge (Complete)**
 
 **Objective**: Connect the working renodeAPI backend to the Qt QML frontend so the UI can control and display simulation state.
 
-- [ ] **Restructure main.cpp** — move Renode initialization off the main thread, re-enable `app.exec()` (currently commented out)
-- [ ] **Create SimulationController QObject** — wrap ExternalControlClient + AMachine with Q_PROPERTYs and Q_INVOKABLEs for QML binding
-- [ ] **Create peripheral QML models** — GpioModel, AdcModel QObjects exposing pin/channel state to QML
-- [ ] **Register C++ types with QML engine** — make backend accessible from QML components
-- [ ] **Set up worker thread** — QThread for Renode communication to keep UI responsive, signals for async event delivery
+- [x] **Restructure main.cpp** — stripped ~300 lines of demo code, re-enabled `app.exec()`, metatype registration for cross-thread signals
+- [x] **Create SimulationController QObject** — QML_ELEMENT wrapping ExternalControlClient + AMachine with Q_PROPERTYs (connected, running, simulationTimeUs, etc.) and Q_INVOKABLEs (connectToRenode, runFor, pause, resume, reset, setGpioPin, setAdcChannel)
+- [x] **Create peripheral QML models** — GpioModel (QAbstractListModel with pinNumber/state/stateName roles, granular dataChanged), AdcModel (channelNumber/value roles)
+- [x] **Register C++ types with QML engine** — QML_ELEMENT + qt_add_qml_module SOURCES (Qt 6.10 best practices, no qmlRegisterType)
+- [x] **Set up worker thread** — RenodeWorker QObject with moveToThread pattern, all Renode socket I/O off main thread, Qt::QueuedConnection auto-queued signals
 
 ---
 
@@ -105,7 +105,7 @@
 **Objective**: Ensure robustness, thread safety, and efficient resource management.
 
 - [x] **Thread safety for backend** — std::mutex on ExternalControlClient, thread-safe EventCallbackRegistry singleton
-- [ ] **Thread safety for GUI interactions** — Qt::QueuedConnection for cross-thread communication between worker and UI threads
+- [x] **Thread safety for GUI interactions** — Qt::QueuedConnection for cross-thread communication between RenodeWorker and SimulationController via moveToThread pattern
 - [ ] **Validate user inputs** (e.g., JSON files, CLI commands) to prevent invalid configurations or crashes
 - [x] **ABI stability** — Pimpl pattern on all public classes, clean interface/implementation separation
 
@@ -132,8 +132,8 @@
 
 ### **Recommended Development Order**
 
-1. **Section 2** — Backend-GUI Bridge (unblocks all UI work)
-2. **Section 3** — Qt GUI Dashboard & Controls
+1. ~~**Section 2** — Backend-GUI Bridge (unblocks all UI work)~~ — COMPLETE
+2. **Section 3** — Qt GUI Dashboard & Controls **(do next)**
 3. **Section 1** — Simulation loop + UART/CAN protocols
 4. **Section 4** — JSON device schema
 5. **Section 5** — Headless CLI
