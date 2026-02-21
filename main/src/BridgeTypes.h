@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QMetaType>
+#include <QString>
+#include <QVector>
 
 struct GpioPinData {
     int pin = 0;
@@ -13,3 +15,20 @@ struct AdcChannelData {
     double value = 0.0;
 };
 Q_DECLARE_METATYPE(AdcChannelData)
+
+struct GpioPortInfo {
+    QString path;     // e.g. "sysbus.gpioPortA"
+    QString name;     // e.g. "gpioPortA"
+    int pinCount = 0;
+};
+
+struct AdcPortInfo {
+    QString path;     // e.g. "sysbus.adc1"
+    QString name;     // e.g. "adc1"
+};
+
+struct DiscoveredPeripherals {
+    QVector<GpioPortInfo> gpioPorts;
+    QVector<AdcPortInfo>  adcPorts;
+};
+Q_DECLARE_METATYPE(DiscoveredPeripherals)

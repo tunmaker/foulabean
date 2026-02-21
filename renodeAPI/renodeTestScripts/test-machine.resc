@@ -1,7 +1,7 @@
 :name: TEST-MACHINE  
 :description: Simple ARM platform for External Control API testing  
 
-#logLevel 2
+logLevel 1
 
 # Create a simple machine  
 mach create "stm32-machine"  

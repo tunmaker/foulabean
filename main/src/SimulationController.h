@@ -37,14 +37,6 @@ class SimulationController : public QObject {
     Q_PROPERTY(GpioModel *gpioModel READ gpioModel CONSTANT FINAL)
     Q_PROPERTY(AdcModel *adcModel READ adcModel CONSTANT FINAL)
 
-    // Configurable peripheral parameters
-    Q_PROPERTY(int gpioPinCount READ gpioPinCount WRITE setGpioPinCount
-               NOTIFY gpioPinCountChanged FINAL)
-    Q_PROPERTY(QString gpioPath READ gpioPath WRITE setGpioPath
-               NOTIFY gpioPathChanged FINAL)
-    Q_PROPERTY(QString adcPath READ adcPath WRITE setAdcPath
-               NOTIFY adcPathChanged FINAL)
-
 public:
     explicit SimulationController(QObject *parent = nullptr);
     ~SimulationController() override;
@@ -60,14 +52,6 @@ public:
     QString simulationTimeFormatted() const;
     GpioModel *gpioModel() const;
     AdcModel *adcModel() const;
-    int gpioPinCount() const;
-    QString gpioPath() const;
-    QString adcPath() const;
-
-    // Property setters for configurable params
-    void setGpioPinCount(int count);
-    void setGpioPath(const QString &path);
-    void setAdcPath(const QString &path);
 
     // User-triggered actions
     Q_INVOKABLE void connectToRenode(const QString &renodePath,
@@ -95,9 +79,6 @@ signals:
     void machineIdChanged();
     void runningChanged();
     void simulationTimeUsChanged();
-    void gpioPinCountChanged();
-    void gpioPathChanged();
-    void adcPathChanged();
 
     // Internal signals forwarded to worker
     void requestConnect(QString renodePath, QString scriptPath,
@@ -108,6 +89,7 @@ signals:
     void requestPause();
     void requestResume();
     void requestReset();
+    void requestDiscoverPeripherals();
     void requestRefreshGpio(QString peripheralPath, int pinCount);
     void requestSetGpioPin(QString peripheralPath, int pin, int state);
     void requestRefreshAdc(QString peripheralPath);
@@ -131,6 +113,7 @@ private slots:
     void onAdcDataUpdated(QString peripheralPath,
                           int channelCount,
                           QVector<AdcChannelData> channels);
+    void onPeripheralsDiscovered(DiscoveredPeripherals discovered);
 
 private:
     void setupWorkerConnections();
@@ -144,10 +127,10 @@ private:
     bool m_running = false;
     quint64 m_simulationTimeUs = 0;
 
-    // Configurable peripheral parameters
-    int m_gpioPinCount = 16;
-    QString m_gpioPath = QStringLiteral("sysbus.gpioPortA");
-    QString m_adcPath = QStringLiteral("sysbus.adc1");
+    // Peripheral parameters — populated by doDiscoverPeripherals
+    int m_gpioPinCount = 0;
+    QString m_gpioPath;
+    QString m_adcPath;
 
     // Owned objects
     GpioModel *m_gpioModel = nullptr;

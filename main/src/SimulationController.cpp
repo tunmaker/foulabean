@@ -49,29 +49,6 @@ QString SimulationController::simulationTimeFormatted() const {
 
 GpioModel *SimulationController::gpioModel() const { return m_gpioModel; }
 AdcModel *SimulationController::adcModel() const { return m_adcModel; }
-int SimulationController::gpioPinCount() const { return m_gpioPinCount; }
-QString SimulationController::gpioPath() const { return m_gpioPath; }
-QString SimulationController::adcPath() const { return m_adcPath; }
-
-// --- Property setters (configurable params) ---
-
-void SimulationController::setGpioPinCount(int count) {
-    if (m_gpioPinCount == count) return;
-    m_gpioPinCount = count;
-    emit gpioPinCountChanged();
-}
-
-void SimulationController::setGpioPath(const QString &path) {
-    if (m_gpioPath == path) return;
-    m_gpioPath = path;
-    emit gpioPathChanged();
-}
-
-void SimulationController::setAdcPath(const QString &path) {
-    if (m_adcPath == path) return;
-    m_adcPath = path;
-    emit adcPathChanged();
-}
 
 // --- Q_INVOKABLE actions ---
 
@@ -130,9 +107,7 @@ void SimulationController::setAdcChannel(int channel, double value) {
 
 void SimulationController::refreshPeripherals() {
     if (!m_connected) return;
-    emit requestRefreshGpio(m_gpioPath, m_gpioPinCount);
-    emit requestRefreshAdc(m_adcPath);
-    emit requestGetTime();
+    emit requestDiscoverPeripherals();
 }
 
 // --- Worker result slots ---
@@ -156,8 +131,8 @@ void SimulationController::onConnected(QString machineName, QString machineId) {
     m_running = true;
     emit runningChanged();
 
-    // Fetch initial peripheral data
-    refreshPeripherals();
+    // Discover peripherals (replaces hardcoded paths)
+    emit requestDiscoverPeripherals();
 }
 
 void SimulationController::onConnectionFailed(QString errorMessage) {
@@ -189,6 +164,10 @@ void SimulationController::onDisconnected() {
     emit machineIdChanged();
     m_simulationTimeUs = 0;
     emit simulationTimeUsChanged();
+
+    m_gpioPath.clear();
+    m_adcPath.clear();
+    m_gpioPinCount = 0;
 
     m_gpioModel->resetPins({});
     m_adcModel->resetChannels(0, {});
@@ -259,10 +238,29 @@ void SimulationController::onAdcDataUpdated(QString peripheralPath,
     m_adcModel->resetChannels(channelCount, channels);
 }
 
+void SimulationController::onPeripheralsDiscovered(DiscoveredPeripherals discovered) {
+    // Store first discovered paths for setGpioPin / setAdcChannel
+    if (!discovered.gpioPorts.isEmpty()) {
+        m_gpioPath     = discovered.gpioPorts[0].path;
+        m_gpioPinCount = discovered.gpioPorts[0].pinCount;
+    }
+    if (!discovered.adcPorts.isEmpty()) {
+        m_adcPath = discovered.adcPorts[0].path;
+    }
+    // Trigger refresh for every discovered port using existing flow
+    for (const auto &gp : discovered.gpioPorts)
+        emit requestRefreshGpio(gp.path, gp.pinCount);
+    for (const auto &ap : discovered.adcPorts)
+        emit requestRefreshAdc(ap.path);
+    emit requestGetTime();
+}
+
 // --- Internal setup ---
 
 void SimulationController::setupWorkerConnections() {
     // Commands: controller -> worker (auto-queued across threads)
+    connect(this, &SimulationController::requestDiscoverPeripherals,
+            m_worker, &RenodeWorker::doDiscoverPeripherals);
     connect(this, &SimulationController::requestConnect,
             m_worker, &RenodeWorker::doConnect);
     connect(this, &SimulationController::requestDisconnect,
@@ -313,4 +311,6 @@ void SimulationController::setupWorkerConnections() {
             this, &SimulationController::onGpioPinChanged);
     connect(m_worker, &RenodeWorker::adcDataUpdated,
             this, &SimulationController::onAdcDataUpdated);
+    connect(m_worker, &RenodeWorker::peripheralsDiscovered,
+            this, &SimulationController::onPeripheralsDiscovered);
 }

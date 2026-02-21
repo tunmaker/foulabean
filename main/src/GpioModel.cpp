@@ -24,7 +24,7 @@ QVariant GpioModel::data(const QModelIndex &index, int role) const {
 QHash<int, QByteArray> GpioModel::roleNames() const {
     return {
         {PinNumberRole, "pinNumber"},
-        {StateRole, "state"},
+        {StateRole, "pinState"},
         {StateNameRole, "stateName"},
     };
 }

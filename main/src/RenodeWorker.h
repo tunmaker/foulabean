@@ -40,6 +40,7 @@ public slots:
     void doRefreshAdc(QString peripheralPath);
     void doSetAdcChannel(QString peripheralPath, int channel, double value);
     void doGetTime();
+    void doDiscoverPeripherals();
 
 signals:
     void connected(QString machineName, QString machineId);
@@ -61,6 +62,7 @@ signals:
     void adcDataUpdated(QString peripheralPath,
                         int channelCount,
                         QVector<AdcChannelData> channels);
+    void peripheralsDiscovered(DiscoveredPeripherals discovered);
 
 private:
     std::unique_ptr<renode::ExternalControlClient> m_client;

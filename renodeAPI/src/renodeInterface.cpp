@@ -464,23 +464,38 @@ std::vector<uint8_t> ExternalControlClient::Impl::recv_response(ApiCommand expec
     uint32_t data_size = 0;
     std::vector<uint8_t> payload;
 
-    switch (return_code) {
-    case COMMAND_FAILED:
-    case FATAL_ERROR:
-    case SUCCESS_WITH_DATA:
+    auto read_payload = [&]() -> bool {
       if (!safe_read_size(data_size)) {
         std::cerr << "recv_response: truncated data_size (return_code=0x"
                   << std::hex << int(return_code) << std::dec << ")\n";
-        return {};
+        return false;
       }
       if (data_size) {
         payload.resize(data_size);
         if (!read_all(sock_fd, payload.data(), data_size)) {
           std::cerr << "recv_response: truncated payload (expected " << data_size
                     << " bytes)\n";
-          return {};
+          return false;
         }
       }
+      return true;
+    };
+
+    switch (return_code) {
+    case COMMAND_FAILED: {
+      if (!read_payload()) return {};
+      std::string msg(payload.begin(), payload.end());
+      std::cerr << "[Renode] COMMAND_FAILED: " << msg << "\n";
+      throw RenodeException("Command failed: " + msg);
+    }
+    case FATAL_ERROR: {
+      if (!read_payload()) return {};
+      std::string msg(payload.begin(), payload.end());
+      std::cerr << "[Renode] FATAL_ERROR: " << msg << "\n";
+      throw RenodeException("Fatal error: " + msg);
+    }
+    case SUCCESS_WITH_DATA:
+      if (!read_payload()) return {};
       break;
     case INVALID_COMMAND:
     case SUCCESS_WITHOUT_DATA:
@@ -533,11 +548,38 @@ struct Monitor::Impl {
   }
 
   // Read until we get a monitor prompt like "(monitor) " or "(machine-name) "
+  // Print all complete lines in `data` to stderr, return any leftover partial line.
+  static std::string printLines(const std::string &prefix,
+                                std::string lineBuf,
+                                const std::string &data) {
+    lineBuf += data;
+    size_t pos;
+    while ((pos = lineBuf.find('\n')) != std::string::npos) {
+      std::cerr << prefix << lineBuf.substr(0, pos + 1);
+      lineBuf.erase(0, pos + 1);
+    }
+    return lineBuf; // partial line, no newline yet
+  }
+
+  // Drain anything pending on the socket (non-blocking) and print it.
+  void drainPrint(const std::string &prefix) {
+    char buf[256];
+    std::string lineBuf;
+    while (true) {
+      ssize_t n = recv(sock_fd, buf, sizeof(buf) - 1, MSG_DONTWAIT);
+      if (n <= 0) break;
+      buf[n] = '\0';
+      lineBuf = printLines(prefix, std::move(lineBuf), buf);
+    }
+    if (!lineBuf.empty())
+      std::cerr << prefix << lineBuf << "\n";
+  }
+
   std::string readUntilPrompt() {
     std::string result;
     char buf[256];
+    std::string lineBuf;
 
-    // std::cerr << "[Monitor] readUntilPrompt: waiting for data...\n";
     while (true) {
       ssize_t n = recv(sock_fd, buf, sizeof(buf) - 1, 0);
       if (n <= 0) {
@@ -546,8 +588,7 @@ struct Monitor::Impl {
       }
       buf[n] = '\0';
       result += buf;
-      // std::cerr << "[Monitor] received " << n << " bytes, total=" << result.size()
-      //           << ", last chars: \"" << result.substr(result.size() > 20 ? result.size() - 20 : 0) << "\"\n";
+      lineBuf = printLines("[Monitor] ", std::move(lineBuf), buf);
 
       // Check if we've received a prompt pattern: (something) followed by space
       // The prompt often has trailing space and may have ANSI codes
@@ -557,7 +598,9 @@ struct Monitor::Impl {
         // Found ") ", now find the matching "("
         size_t openPos = result.rfind('(', promptMarker);
         if (openPos != std::string::npos && promptMarker > openPos) {
-          // std::cerr << "[Monitor] found prompt at pos " << openPos << " to " << promptMarker << "\n";
+          // Print the partial prompt line (no newline) so it's visible
+          if (!lineBuf.empty())
+            std::cerr << "[Monitor] " << lineBuf << "\n";
           // Remove the prompt (and any ANSI codes before it) from output
           // Find the start of the line containing the prompt
           size_t lineStart = result.rfind('\n', openPos);
@@ -568,13 +611,16 @@ struct Monitor::Impl {
         }
       }
     }
-    // std::cerr << "[Monitor] readUntilPrompt done, result length=" << result.size() << "\n";
     return result;
   }
 
   // Send command and read response
   Result<std::string> sendCommand(const std::string &cmd) {
+    // Drain any spontaneous output Renode sent since the last command
+    drainPrint("[Monitor] ");
+
     std::string cmdLine = cmd + "\n";
+    std::cerr << "[Monitor] >>> " << cmd << "\n";
     if (send(sock_fd, cmdLine.c_str(), cmdLine.size(), 0) < 0) {
       return {"", {1, "Failed to send command"}};
     }

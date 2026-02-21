@@ -13,9 +13,6 @@ ApplicationWindow {
 
     SimulationController {
         id: sim
-        gpioPath: "sysbus.gpioPortA"
-        adcPath: "sysbus.adc1"
-        gpioPinCount: 16
     }
 
     ScrollView {
@@ -167,14 +164,14 @@ ApplicationWindow {
 
                             delegate: RowLayout {
                                 required property int pinNumber
-                                required property int state
+                                required property int pinState
                                 required property string stateName
 
                                 spacing: 4
 
                                 Rectangle {
                                     width: 10; height: 10; radius: 5
-                                    color: state === 1 ? "#2e7d32" : state === 0 ? "#c62828" : "#9e9e9e"
+                                    color: pinState === 1 ? "#2e7d32" : pinState === 0 ? "#c62828" : "#9e9e9e"
                                 }
 
                                 Label {

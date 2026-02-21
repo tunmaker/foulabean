@@ -2,6 +2,7 @@
 #include "renodeInterface.h"
 #include "renodeInternal.h"
 #include <cstring>
+#include <iostream>
 #include <map>
 #include <sstream>
 
@@ -315,6 +316,9 @@ std::shared_ptr<Adc> AMachine::getAdc(const std::string &path, Error &err) noexc
 
     // Response should be 4 bytes: the assigned instance ID
     if (response.size() != sizeof(int32_t)) {
+      std::cerr << "[ADC] registration response size=" << response.size() << " bytes:";
+      for (auto b : response) std::cerr << " " << std::hex << (int)b;
+      std::cerr << std::dec << "\n";
       err = {2, "Unexpected response size from ADC registration"};
       return nullptr;
     }
