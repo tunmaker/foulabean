@@ -124,8 +124,14 @@ ApplicationWindow {
                         spacing: 8
 
                         Button {
-                            text: "Run 100ms"
+                            text: "Step 100ms"
+                            enabled: !sim.continuousRun
                             onClicked: sim.runFor(100)
+                        }
+
+                        Button {
+                            text: sim.continuousRun ? "⏹ Stop" : "▶ Run"
+                            onClicked: sim.setContinuousRun(!sim.continuousRun)
                         }
 
                         Button {

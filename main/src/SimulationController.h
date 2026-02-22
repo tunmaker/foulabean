@@ -29,6 +29,8 @@ class SimulationController : public QObject {
 
     // Simulation state
     Q_PROPERTY(bool running READ running NOTIFY runningChanged FINAL)
+    Q_PROPERTY(bool continuousRun READ continuousRun
+               WRITE setContinuousRun NOTIFY continuousRunChanged FINAL)
     Q_PROPERTY(quint64 simulationTimeUs READ simulationTimeUs
                NOTIFY simulationTimeUsChanged FINAL)
     Q_PROPERTY(QString simulationTimeFormatted READ simulationTimeFormatted
@@ -53,6 +55,8 @@ public:
     QString machineName() const;
     QString machineId() const;
     bool running() const;
+    bool continuousRun() const;
+    Q_INVOKABLE void setContinuousRun(bool enabled);
     quint64 simulationTimeUs() const;
     QString simulationTimeFormatted() const;
     GpioModel *gpioModel() const;
@@ -86,6 +90,7 @@ signals:
     void machineNameChanged();
     void machineIdChanged();
     void runningChanged();
+    void continuousRunChanged();
     void simulationTimeUsChanged();
     void selectedScriptChanged();
 
@@ -130,6 +135,7 @@ private:
     // State
     bool m_connected = false;
     bool m_connecting = false;
+    bool m_continuousRun = false;
     QString m_connectionError;
     QString m_machineName;
     QString m_machineId;

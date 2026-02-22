@@ -39,6 +39,16 @@ QString SimulationController::connectionError() const { return m_connectionError
 QString SimulationController::machineName() const { return m_machineName; }
 QString SimulationController::machineId() const { return m_machineId; }
 bool SimulationController::running() const { return m_running; }
+bool SimulationController::continuousRun() const { return m_continuousRun; }
+
+void SimulationController::setContinuousRun(bool enabled) {
+    if (m_continuousRun == enabled) return;
+    m_continuousRun = enabled;
+    emit continuousRunChanged();
+    if (m_continuousRun && m_connected)
+        emit requestRunFor(100, 1000);
+}
+
 quint64 SimulationController::simulationTimeUs() const { return m_simulationTimeUs; }
 
 QString SimulationController::simulationTimeFormatted() const {
@@ -179,6 +189,11 @@ void SimulationController::onDisconnected() {
         emit runningChanged();
     }
 
+    if (m_continuousRun) {
+        m_continuousRun = false;
+        emit continuousRunChanged();
+    }
+
     m_machineName.clear();
     emit machineNameChanged();
     m_machineId.clear();
@@ -202,10 +217,15 @@ void SimulationController::onSimulationTimeUpdated(quint64 timeMicroseconds) {
 }
 
 void SimulationController::onRunForCompleted() {
-    // Time is already updated via onSimulationTimeUpdated
+    if (m_continuousRun && m_connected)
+        emit requestRunFor(100, 1000);
 }
 
 void SimulationController::onRunForFailed(QString errorMessage) {
+    if (m_continuousRun) {
+        m_continuousRun = false;
+        emit continuousRunChanged();
+    }
     if (m_connectionError != errorMessage) {
         m_connectionError = errorMessage;
         emit connectionErrorChanged();
