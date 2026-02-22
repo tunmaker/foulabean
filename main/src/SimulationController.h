@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QThread>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 #include <QtQml/qqmlregistration.h>
 
@@ -37,6 +38,10 @@ class SimulationController : public QObject {
     Q_PROPERTY(GpioModel *gpioModel READ gpioModel CONSTANT FINAL)
     Q_PROPERTY(AdcModel *adcModel READ adcModel CONSTANT FINAL)
 
+    // Script selection
+    Q_PROPERTY(QStringList rescScriptNames READ rescScriptNames CONSTANT FINAL)
+    Q_PROPERTY(QString selectedScript READ selectedScript NOTIFY selectedScriptChanged FINAL)
+
 public:
     explicit SimulationController(QObject *parent = nullptr);
     ~SimulationController() override;
@@ -52,15 +57,18 @@ public:
     QString simulationTimeFormatted() const;
     GpioModel *gpioModel() const;
     AdcModel *adcModel() const;
+    QStringList rescScriptNames() const;
+    QString selectedScript() const;
 
     // User-triggered actions
+    Q_INVOKABLE void selectScript(int index);
     Q_INVOKABLE void connectToRenode(const QString &renodePath,
                                      const QString &scriptPath,
                                      const QString &host = QStringLiteral("127.0.0.1"),
                                      int port = 5555,
                                      int monitorPort = 5556,
                                      int timeoutMs = 15000,
-                                     const QString &machineName = QStringLiteral("stm32-machine"));
+                                     const QString &machineName = QStringLiteral("test-machine"));
     Q_INVOKABLE void disconnect();
     Q_INVOKABLE void runFor(quint64 durationMs);
     Q_INVOKABLE void pause();
@@ -79,6 +87,7 @@ signals:
     void machineIdChanged();
     void runningChanged();
     void simulationTimeUsChanged();
+    void selectedScriptChanged();
 
     // Internal signals forwarded to worker
     void requestConnect(QString renodePath, QString scriptPath,
@@ -126,6 +135,11 @@ private:
     QString m_machineId;
     bool m_running = false;
     quint64 m_simulationTimeUs = 0;
+
+    // Script selection
+    QStringList m_rescScriptNames;
+    QStringList m_rescScriptPaths;
+    QString m_selectedScript;
 
     // Peripheral parameters — populated by doDiscoverPeripherals
     int m_gpioPinCount = 0;

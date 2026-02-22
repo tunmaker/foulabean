@@ -3,12 +3,22 @@
 #include "AdcModel.h"
 #include "RenodeWorker.h"
 
+#include <QDir>
+
 SimulationController::SimulationController(QObject *parent)
     : QObject(parent)
     , m_gpioModel(new GpioModel(this))
     , m_adcModel(new AdcModel(this))
     , m_worker(new RenodeWorker) // no parent — will be moved to thread
 {
+    QDir scriptsDir(QString::fromUtf8(RENODE_SCRIPTS_DIR));
+    const auto entries = scriptsDir.entryInfoList({QStringLiteral("*.resc")},
+                                                   QDir::Files, QDir::Name);
+    for (const QFileInfo &entry : entries) {
+        m_rescScriptNames << entry.fileName();
+        m_rescScriptPaths << entry.absoluteFilePath();
+    }
+
     m_worker->moveToThread(&m_workerThread);
     connect(&m_workerThread, &QThread::finished,
             m_worker, &QObject::deleteLater);
@@ -49,6 +59,17 @@ QString SimulationController::simulationTimeFormatted() const {
 
 GpioModel *SimulationController::gpioModel() const { return m_gpioModel; }
 AdcModel *SimulationController::adcModel() const { return m_adcModel; }
+QStringList SimulationController::rescScriptNames() const { return m_rescScriptNames; }
+QString SimulationController::selectedScript() const { return m_selectedScript; }
+
+void SimulationController::selectScript(int index) {
+    if (index < 0 || index >= m_rescScriptPaths.size()) return;
+    const QString path = m_rescScriptPaths.at(index);
+    if (m_selectedScript != path) {
+        m_selectedScript = path;
+        emit selectedScriptChanged();
+    }
+}
 
 // --- Q_INVOKABLE actions ---
 

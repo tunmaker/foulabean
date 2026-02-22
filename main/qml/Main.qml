@@ -54,12 +54,30 @@ ApplicationWindow {
                     RowLayout {
                         spacing: 8
 
+                        Label {
+                            text: "Test Script:"
+                        }
+
+                        ComboBox {
+                            id: scriptCombo
+                            model: sim.rescScriptNames
+                            currentIndex: -1
+                            displayText: currentIndex === -1 ? "— select a script —" : currentText
+                            Layout.fillWidth: true
+                            enabled: !sim.connected && !sim.connecting
+                            onActivated: sim.selectScript(currentIndex)
+                        }
+                    }
+
+                    RowLayout {
+                        spacing: 8
+
                         Button {
                             text: "Connect"
-                            enabled: !sim.connected && !sim.connecting
+                            enabled: !sim.connected && !sim.connecting && sim.selectedScript !== ""
                             onClicked: sim.connectToRenode(
                                 "/home/tunmaker/packages/renode_portable/renode",
-                                "/home/tunmaker/projects/digitwin/src/renodeAPI/renodeTestScripts/test-machine.resc"
+                                sim.selectedScript
                             )
                         }
 

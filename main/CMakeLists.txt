@@ -41,6 +41,10 @@ target_include_directories(${TARGET_NAME}
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+target_compile_definitions(${TARGET_NAME} PRIVATE
+    RENODE_SCRIPTS_DIR="${CMAKE_SOURCE_DIR}/renodeAPI/renodeTestScripts"
+)
+
 target_link_libraries(${TARGET_NAME}
     PRIVATE Qt6::Quick
     PRIVATE renodeAPI::renodeAPI
