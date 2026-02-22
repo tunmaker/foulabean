@@ -4,6 +4,7 @@
 #include "RenodeWorker.h"
 
 #include <QDir>
+#include <QDirIterator>
 
 SimulationController::SimulationController(QObject *parent)
     : QObject(parent)
@@ -11,11 +12,14 @@ SimulationController::SimulationController(QObject *parent)
     , m_adcModel(new AdcModel(this))
     , m_worker(new RenodeWorker) // no parent — will be moved to thread
 {
-    QDir scriptsDir(QString::fromUtf8(RENODE_SCRIPTS_DIR));
-    const auto entries = scriptsDir.entryInfoList({QStringLiteral("*.resc")},
-                                                   QDir::Files, QDir::Name);
-    for (const QFileInfo &entry : entries) {
-        m_rescScriptNames << entry.fileName();
+    const QString scriptsDirPath = QString::fromUtf8(RENODE_SCRIPTS_DIR);
+    QDirIterator it(scriptsDirPath, {QStringLiteral("*.resc")},
+                    QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        it.next();
+        const QFileInfo &entry = it.fileInfo();
+        // Show path relative to RENODE_SCRIPTS_DIR so subdirectory context is visible
+        m_rescScriptNames << QDir(scriptsDirPath).relativeFilePath(entry.absoluteFilePath());
         m_rescScriptPaths << entry.absoluteFilePath();
     }
 
