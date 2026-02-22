@@ -1,0 +1,28 @@
+# =============================================================================
+# STM32H753ZI — Crypto Accelerator AES Modes with DMA Test
+# Validates: STM32H7 CRYP peripheral + DMA transfers
+# Platform:  Nucleo H753ZI board
+# Binary:    STM32CubeH7 CRYP AES Modes DMA sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/nucleo_h753zi.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/stm32cubeh7--stm32h753zi-CRYP_AESModes_DMA.elf-s_2152168-edf19388077bb230a242d2dfc7392ea881f29051
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+logLevel -1 sysbus.dma1
+logLevel -1 sysbus.dma2
+
+start

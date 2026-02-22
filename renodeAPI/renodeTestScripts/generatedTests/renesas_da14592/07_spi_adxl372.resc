@@ -1,0 +1,37 @@
+# =============================================================================
+# Renesas DA14592 — SPI Test (ADXL372 Accelerometer)
+# Validates: SPI controller with attached ADXL372 sensor mock
+# Platform:  Renesas DA14592
+# Binary:    SDK SPI sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/renesas-da14592.repl
+
+# Attach ADXL372 accelerometer on SPI bus at position 1
+machine LoadPlatformDescriptionFromString "adxl372: Sensors.ADXL372 @ spi 1"
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-spi_sample.bin-s_43188-944034990fb62e11fe2738530f1420b6e232819a
+$symbolsElf?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-spi_sample.elf-s_1490188-9f030ab673cc588fb2c19ed3da3fde7d973259e7
+
+macro reset
+"""
+    sysbus LoadBinary $bin 0x0
+    sysbus LoadSymbolsFrom $symbolsElf
+"""
+runMacro $reset
+
+# Pre-load nominal accelerometer values
+sysbus.spi.adxl372 AccelerationX 0
+sysbus.spi.adxl372 AccelerationY 0
+sysbus.spi.adxl372 AccelerationZ 0
+
+start
+
+# Expected output on uart1: X = 0, Y = 0, Z = 0

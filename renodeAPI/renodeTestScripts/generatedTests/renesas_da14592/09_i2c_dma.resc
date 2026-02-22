@@ -1,0 +1,47 @@
+# =============================================================================
+# Renesas DA14592 — I2C with DMA Test
+# Validates: I2C controller with DMA-triggered transfers
+# Platform:  Renesas DA14592
+# Binary:    SDK I2C example with DMA
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/renesas-da14592.repl
+
+# Add a mock I2C echo slave at address 0x75
+machine LoadPlatformDescriptionFromString "dummy: Mocks.DummyI2CSlave @ i2c 0x75"
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas-da14592--sdk-i2c_example.bin-s_68956-a27edc575b95fc553d5d626afe5e7c5581be1977
+$symbolsElf?=@https://dl.antmicro.com/projects/renode/renesas-da14592--sdk-i2c_example.elf-s_1483872-07e845601c2acfcd439249f3ba3e5d19cdc37445
+
+macro reset
+"""
+    sysbus LoadBinary $bin 0x0
+    sysbus LoadSymbolsFrom $symbolsElf
+"""
+runMacro $reset
+
+# Set up echo behavior
+python """
+class EchoI2CPeripheral:
+    def __init__(self, dummy):
+        self.dummy = dummy
+
+    def write(self, data):
+        self.dummy.EnqueueResponseBytes(data)
+
+def mc_setup_echo_i2c_peripheral(path):
+    dummy = monitor.Machine[path]
+    dummy.DataReceived += EchoI2CPeripheral(dummy).write
+"""
+setup_echo_i2c_peripheral "sysbus.i2c.dummy"
+
+logLevel -1 sysbus.dma
+
+start

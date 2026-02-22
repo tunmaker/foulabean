@@ -1,0 +1,24 @@
+# =============================================================================
+# CAN — CAN Counter Loopback Test
+# Validates: CAN frame counter sample in loopback mode
+# Platform:  STM32H753 CPU
+# Binary:    Zephyr CAN counter loopback sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/nucleo_h743zi--zephyr-samples-drivers-can-counter--loopback.elf-s_1391916-0b17986e6f81b9d38be88cf70c6a5d616de19234
+
+sysbus LoadELF $bin
+
+emulation CreateCANHub "canHub" true
+connector Connect sysbus.fdcan1 canHub
+
+start

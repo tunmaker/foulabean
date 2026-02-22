@@ -1,0 +1,25 @@
+# =============================================================================
+# STM32H753ZI — Crypto Accelerator AES-GCM (Interrupt Mode) Test
+# Validates: STM32H7 CRYP peripheral with interrupt-driven operation
+# Platform:  Nucleo H753ZI board
+# Binary:    STM32CubeH7 CRYP AES-GCM IT sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/nucleo_h753zi.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/stm32cubeh7--stm32h753zi-CRYP_AESGCM_IT.elf-s_2137876-ee038aa93bf68cb91af9894e0be9584eec3057e5
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+start

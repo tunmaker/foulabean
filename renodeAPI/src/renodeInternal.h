@@ -37,13 +37,15 @@ public:
   }
 
   bool invokeCallback(uint32_t ed, const uint8_t* data, size_t size) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = callbacks_.find(ed);
-    if (it != callbacks_.end()) {
-      it->second(data, size);
-      return true;
+    RawCallback cb;
+    {
+      std::lock_guard<std::mutex> lock(mtx_);
+      auto it = callbacks_.find(ed);
+      if (it == callbacks_.end()) return false;
+      cb = it->second;  // copy while holding lock
     }
-    return false;
+    try { cb(data, size); } catch (...) {}
+    return true;
   }
 
 private:

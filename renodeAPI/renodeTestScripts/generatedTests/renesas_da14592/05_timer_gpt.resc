@@ -1,0 +1,32 @@
+# =============================================================================
+# Renesas DA14592 — Timer (GPT) Test
+# Validates: General Purpose Timer (GPT) tick interrupts
+# Platform:  Renesas DA14592
+# Binary:    SDK GPT sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/renesas-da14592.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-gpt_sample.bin-s_44196-90bb5fd7a2da259e36db86eccfb9b6b4f6177b87
+$symbolsElf?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-gpt_sample.elf-s_1305560-b68c731499af957e243d1abdd346d8bf7c59c30f
+
+macro reset
+"""
+    sysbus LoadBinary $bin 0x0
+    sysbus LoadSymbolsFrom $symbolsElf
+"""
+runMacro $reset
+
+# Freeze watchdog so it doesn't reset the machine during the timer test
+sysbus.sys_wdog Frozen true
+
+start
+
+# Expected output on uart1: "Timer tick!" (approximately once per second)

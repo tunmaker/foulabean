@@ -1,0 +1,44 @@
+# =============================================================================
+# Advanced — Headless CI Runner Template
+#
+# All scripts in this suite are designed for headless execution:
+#   renode --console --disable-gui \
+#     -e "include @scripts/stm32h753zi/01_gpio_blinky.resc"
+#
+# The External Control Server on port 5555 allows your test harness to
+# interact with the "test-machine" via the API.
+#
+# To run with a time limit (prevents hanging):
+#   renode --console --disable-gui \
+#     -e "include @scripts/stm32h753zi/01_gpio_blinky.resc" \
+#     -e 'emulation RunFor "10"' \
+#     -e "quit"
+#
+# Shell wrapper example:
+#   #!/bin/bash
+#   SCRIPT=$1
+#   TIMEOUT=${2:-10}
+#   renode --console --disable-gui -p \
+#     -e "include @${SCRIPT}" \
+#     -e "emulation RunFor \"${TIMEOUT}\"" \
+#     -e "quit" 2>&1 | tee renode_output.log
+#   grep -q "FAIL\|Exception" renode_output.log && exit 1 || exit 0
+#
+# CLI flags reference:
+#   --console         Monitor in console (not separate window)
+#   --disable-gui     No XWT GUI
+#   -p (--plain)      No ANSI color codes in output
+#   --hide-monitor    Don't show Monitor window
+#   --hide-log        Don't show log messages in console
+#   --hide-analyzers  Don't show analyzer windows
+#   -e COMMAND        Execute command on startup (repeatable)
+#   -P PORT           Listen for Monitor commands on TCP port
+#
+# All scripts in this suite:
+#   - Use machine name "test-machine"
+#   - Start ExternalControlServer on port 5555
+#   - Pre-set all interactive inputs to nominal values
+#   - End with `start` (emulation begins immediately)
+# =============================================================================
+
+# This file is a reference — not meant to be run directly.

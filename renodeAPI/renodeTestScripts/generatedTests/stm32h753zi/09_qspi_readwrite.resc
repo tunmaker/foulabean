@@ -1,0 +1,29 @@
+# =============================================================================
+# STM32H753ZI — QSPI Flash Read/Write (Interrupt) Test
+# Validates: QuadSPI controller + external flash (Macronix MX25R)
+# Platform:  Nucleo H753ZI board + external QSPI flash
+# Binary:    STM32CubeH7 QSPI ReadWrite IT sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/nucleo_h753zi.repl
+
+# Add external QSPI flash
+machine LoadPlatformDescriptionFromString "externalQspiFlash: SPI.Macronix_MX25R @ qspi {underlyingMemory: qspiMappedFlashMemory}"
+machine LoadPlatformDescriptionFromString "qspiMappedFlashMemory: Memory.MappedMemory @ sysbus 0x90000000 { size: 0x10000000 }"
+
+$bin?=@https://dl.antmicro.com/projects/renode/stm32cubeh7--stm32h753zi-QSPI_ReadWrite_IT.elf-s_2146460-5c6870c2698fe33a9ef78ce791d9e83439328cc4
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+start

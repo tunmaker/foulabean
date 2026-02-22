@@ -1,0 +1,66 @@
+# =============================================================================
+# Advanced — Python Assertion Patterns for .resc Scripts
+# Demonstrates how to assert/verify state WITHOUT Robot Framework
+# =============================================================================
+
+using sysbus
+
+# --- Example: Assert a register value ---
+# After loading and running a binary, check a memory-mapped register:
+#
+# python """
+# val = monitor.Machine.SystemBus.ReadDoubleWord(0x40020414)  # GPIOB ODR
+# expected = 0x00000080  # Pin 7 high
+# if val != expected:
+#     raise Exception(f"GPIO ODR mismatch: expected {hex(expected)}, got {hex(val)}")
+# print(f"GPIO ODR check passed: {hex(val)}")
+# """
+
+# --- Example: Watchpoint-based halt on address write ---
+# Halts emulation when a specific address is written:
+#
+# python """
+# from Antmicro.Renode.Peripherals.Bus import Access, SysbusAccessWidth
+# bus = monitor.Machine.SystemBus
+#
+# def on_write(_, __, ___, value):
+#     if value == 0xCAFEBABE:
+#         print("SUCCESS: Test marker written!")
+#         monitor.Machine.Pause()
+#     else:
+#         print(f"Write observed: {hex(value)}")
+#
+# bus.AddWatchpointHook(0x20000000, SysbusAccessWidth.DoubleWord, Access.Write, on_write)
+# """
+
+# --- Example: Time-bounded execution ---
+# Run for exactly N seconds of virtual time, then check state:
+#
+# start
+# emulation RunFor "5"
+# pause
+#
+# python """
+# # Check state after 5 seconds of virtual time
+# val = monitor.Machine.SystemBus.ReadDoubleWord(0x40020414)
+# print(f"After 5s, GPIOB ODR = {hex(val)}")
+# """
+
+# --- Example: UART output capture via Python ---
+# Use a virtual console and Python hook to buffer UART output:
+#
+# python """
+# uart = monitor.Machine["sysbus.usart3"]
+# collected = []
+#
+# def on_char(_, args):
+#     collected.append(chr(args.Byte))
+#     line = ''.join(collected)
+#     if line.endswith('\n'):
+#         print(f"UART: {line.strip()}")
+#         if "PASS" in line:
+#             print("TEST PASSED")
+#         collected.clear()
+#
+# uart.CharReceived += on_char
+# """

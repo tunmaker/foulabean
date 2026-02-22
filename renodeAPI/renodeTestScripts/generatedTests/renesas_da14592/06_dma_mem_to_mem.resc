@@ -1,0 +1,29 @@
+# =============================================================================
+# Renesas DA14592 — DMA Memory-to-Memory Test
+# Validates: DMA controller mem-to-mem transfers
+# Platform:  Renesas DA14592
+# Binary:    SDK DMA mem-to-mem sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/renesas-da14592.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-dma_mem_to_mem.bin-s_45332-cb73b4ea7fc562627ba10e9d64d2128527917273
+$symbolsElf?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-dma_mem_to_mem.elf-s_1301508-5370b27c1b1a252e07446758579c5fefaff168a9
+
+macro reset
+"""
+    sysbus LoadBinary $bin 0x0
+    sysbus LoadSymbolsFrom $symbolsElf
+"""
+runMacro $reset
+
+logLevel -1 sysbus.dma
+
+start

@@ -1,0 +1,24 @@
+# =============================================================================
+# CAN — MCAN Driver API Test (Loopback)
+# Validates: CAN driver API compliance in loopback mode
+# Platform:  STM32H753 CPU
+# Binary:    Zephyr CAN driver API test
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/nucleo_h743zi--zephyr-tests-drivers-can-api.elf-s_2039836-5cbc533cfc6334d3df2b0f8ef504c28093fa4dd8
+
+sysbus LoadELF $bin
+
+emulation CreateCANHub "canHub" true
+connector Connect sysbus.fdcan1 canHub
+
+start

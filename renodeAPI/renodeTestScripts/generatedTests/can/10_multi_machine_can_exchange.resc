@@ -1,0 +1,37 @@
+# =============================================================================
+# CAN — Multi-Machine CAN Message Exchange
+# Validates: CAN frame exchange between two machines via shared hub
+# Platform:  STM32H753 CPU x2
+# Binary:    Zephyr CAN sockets sample (no loopback)
+# NOTE:      Creates TWO machines; "test-machine" is machine-0.
+#            Machine-1 is named "test-machine-1".
+# =============================================================================
+
+using sysbus
+
+# Shared CAN hub (no loopback — real inter-machine exchange)
+emulation CreateCANHub "canHub"
+
+# === Machine 0 (primary — "test-machine") ===
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/nucleo_h743zi--zephyr-samples-net-sockets-can.elf-s_2243040-d8ba11b258437935c3880cf3e162f448f55c6f17
+
+sysbus LoadELF $bin
+connector Connect sysbus.fdcan1 canHub
+
+# === Machine 1 ===
+mach create "test-machine-1"
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+sysbus LoadELF $bin
+connector Connect sysbus.fdcan1 canHub
+
+# Synchronization for multi-machine
+emulation SetGlobalSerialExecution true
+
+start

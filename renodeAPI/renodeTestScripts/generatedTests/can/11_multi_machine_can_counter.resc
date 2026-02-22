@@ -1,0 +1,33 @@
+# =============================================================================
+# CAN — Multi-Machine CAN Counter Exchange
+# Validates: CAN counter sample across two machines (no loopback)
+# Platform:  STM32H753 CPU x2
+# Binary:    Zephyr CAN counter sample (no loopback)
+# =============================================================================
+
+using sysbus
+
+emulation CreateCANHub "canHub"
+
+# === Machine 0 (primary — "test-machine") ===
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/nucleo_h743zi--zephyr-samples-drivers-can-counter.elf-s_1391464-17e71d5820ab718e5dc89f8480644c576306d24c
+
+sysbus LoadELF $bin
+connector Connect sysbus.fdcan1 canHub
+
+# === Machine 1 ===
+mach create "test-machine-1"
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+sysbus LoadELF $bin
+connector Connect sysbus.fdcan1 canHub
+
+emulation SetGlobalSerialExecution true
+
+start

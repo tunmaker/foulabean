@@ -1,0 +1,33 @@
+# =============================================================================
+# Renesas DA14592 — Watchdog Test
+# Validates: System watchdog (sys_wdog) timeout and reset behavior
+# Platform:  Renesas DA14592
+# Binary:    SDK Watchdog sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/renesas-da14592.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-watchdog_sample.bin-s_41400-a4756b01832abd9bd41143bd7c27db7b39db6031
+$symbolsElf?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-watchdog_sample.elf-s_1303312-8bc26c376a46712a15126400d9ededc496fd2037
+
+macro reset
+"""
+    sysbus LoadBinary $bin 0x0
+    sysbus LoadSymbolsFrom $symbolsElf
+"""
+runMacro $reset
+
+logLevel -1 sysbus.sys_wdog
+sysbus LogPeripheralAccess sysbus.gp_regs
+
+start
+
+# The sample freezes/unfreezes watchdog and demonstrates reset.
+# Watch for: "sys_wdog: Limit reached" in logs

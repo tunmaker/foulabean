@@ -1,0 +1,28 @@
+# =============================================================================
+# STM32H753ZI — QSPI Execute-In-Place (XIP) Test
+# Validates: Code execution directly from QSPI-mapped flash
+# Platform:  Nucleo H753ZI board + external QSPI flash
+# Binary:    STM32CubeH7 QSPI ExecuteInPlace sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/nucleo_h753zi.repl
+
+machine LoadPlatformDescriptionFromString "externalQspiFlash: SPI.Macronix_MX25R @ qspi {underlyingMemory: qspiMappedFlashMemory}"
+machine LoadPlatformDescriptionFromString "qspiMappedFlashMemory: Memory.MappedMemory @ sysbus 0x90000000 { size: 0x10000000 }"
+
+$bin?=@https://dl.antmicro.com/projects/renode/stm32cubeh7--stm32h753zi-QSPI_ExecuteInPlace.elf-s_2233412-67befe44572c483b242a95ce8e714f75f4e7dc69
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+start

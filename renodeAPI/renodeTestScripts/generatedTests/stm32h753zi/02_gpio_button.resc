@@ -1,0 +1,29 @@
+# =============================================================================
+# STM32H753ZI — GPIO Button Input Test
+# Validates: GPIO input (button press detection)
+# Platform:  Nucleo H753ZI board
+# Binary:    Zephyr button sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/nucleo_h753zi.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/zephyr--nucleo_h753zi_button_sample.elf-s_582696-3d5e6775a24c75e8fff6b812d5bc850b361e3d93
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+# Log GPIO port C (user button typically on PC13) and port B (LED response)
+logLevel -1 sysbus.gpioPortC
+logLevel -1 sysbus.gpioPortB
+
+start

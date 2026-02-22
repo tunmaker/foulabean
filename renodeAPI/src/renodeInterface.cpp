@@ -526,6 +526,14 @@ std::string ExternalControlClient::bytes_to_string(const std::vector<uint8_t> &v
   return s;
 }
 
+int ExternalControlClient::getSocketFd() const noexcept {
+  return pimpl_ ? pimpl_->sock_fd : -1;
+}
+
+void dispatchEvent(uint32_t ed, const uint8_t *data, size_t size) noexcept {
+  EventCallbackRegistry::instance().invokeCallback(ed, data, size);
+}
+
 // Move constructors implementation
 ExternalControlClient::ExternalControlClient(ExternalControlClient&& other) noexcept = default;
 ExternalControlClient& ExternalControlClient::operator=(ExternalControlClient&&) noexcept = default;

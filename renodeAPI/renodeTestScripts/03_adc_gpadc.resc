@@ -1,0 +1,37 @@
+# =============================================================================
+# Renesas DA14592 — ADC (GPADC) Test
+# Validates: GPADC sampling with RESD file feeding
+# Platform:  Renesas DA14592
+# Binary:    SDK ADC sample
+# RESD:      Pre-generated GPADC sample data
+# =============================================================================
+
+using sysbus
+
+$name?="da14592-adc"
+mach create $name
+
+machine LoadPlatformDescription @platforms/cpus/renesas-da14592.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-adc_sample.bin-s_42412-84790dc8f65a890e952e59353e80f4708ca4325f
+$symbolsElf?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-adc_sample.elf-s_1412432-54c1b6468094ec1439f16264fe4a9447b4d69567
+$adcResd?=@https://dl.antmicro.com/projects/renode/renesas_da14_gpadc.resd-s_49-d7ebebfafe5c44561381ab5c3ffe65266f0a8ad3
+
+macro reset
+"""
+    sysbus LoadBinary $bin 0x0
+    sysbus LoadSymbolsFrom $symbolsElf
+"""
+runMacro $reset
+
+# --- Peripheral setup ---
+showAnalyzer sysbus.uart1
+
+# Feed ADC samples from RESD file (channel 6, 6 samples)
+sysbus.gpadc FeedSamplesFromRESD @$adcResd 6 6
+
+start
+
+# Expected output:
+# ADC read completed
+# Number of samples: 21, ADC result value: 19026

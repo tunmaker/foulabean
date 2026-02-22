@@ -1,0 +1,26 @@
+# Renode test script: Renesas RA8M1 — LED Blink (GPIO / AGT timer)
+# This script creates an RA8M1 machine, loads the AGT blinky sample,
+# and watches the blue LED on GPIO port 6 toggle periodically.
+
+using sysbus
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/renesas-ek_ra8m1.repl
+
+set bin @https://dl.antmicro.com/projects/renode/renesas_ek_ra8m1--agt.elf-s_391008-c0a91e7f3d279b86269ca83ac0aabb9936f94838
+macro reset "sysbus LoadELF $bin"
+runMacro $reset
+
+# Set up Segger RTT console for log output
+machine CreateVirtualConsole "segger_rtt"
+include @scripts/single-node/segger-rtt.py
+setup_segger_rtt sysbus.segger_rtt
+showAnalyzer sysbus.segger_rtt
+
+# Log GPIO port 6 state changes (blue LED)
+logLevel -1 sysbus.port6
+
+start

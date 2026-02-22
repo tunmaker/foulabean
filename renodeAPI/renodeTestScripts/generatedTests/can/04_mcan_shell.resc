@@ -1,0 +1,24 @@
+# =============================================================================
+# CAN — MCAN Shell Test (Loopback)
+# Validates: CAN shell commands and interactive CAN usage
+# Platform:  STM32H753 CPU
+# Binary:    Zephyr CAN shell test
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/nucleo_h743zi--zephyr-tests-drivers-can-shell.elf-s_1642156-92afb142a6be519e6cf51ecb34023167bb66e1fd
+
+sysbus LoadELF $bin
+
+emulation CreateCANHub "canHub" true
+connector Connect sysbus.fdcan1 canHub
+
+start

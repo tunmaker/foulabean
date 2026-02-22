@@ -1,0 +1,27 @@
+# =============================================================================
+# STM32H753ZI — Ethernet PTP (Precision Time Protocol) Test
+# Validates: Ethernet MAC with PTP timestamping
+# Platform:  Nucleo H753ZI board
+# Binary:    Zephyr PTP sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/nucleo_h753zi.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/nucleo_h753zi--zephyr-samples_net_ptp.elf-s_4678660-79097838e7a15377e3d9ce083917220bd0705312
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+logLevel -1 sysbus.ethernet
+
+start

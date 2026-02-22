@@ -1,0 +1,24 @@
+# =============================================================================
+# CAN — MCAN Timing Test (Loopback)
+# Validates: CAN bit timing configuration
+# Platform:  STM32H753 CPU
+# Binary:    Zephyr CAN timing test
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/nucleo_h743zi--zephyr-tests-drivers-can-timing.elf-s_1873596-3a77a90c168202844bf70717b6a221b73e69926c
+
+sysbus LoadELF $bin
+
+emulation CreateCANHub "canHub" true
+connector Connect sysbus.fdcan1 canHub
+
+start

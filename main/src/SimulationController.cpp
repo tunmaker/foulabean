@@ -189,6 +189,7 @@ void SimulationController::onDisconnected() {
     m_gpioPath.clear();
     m_adcPath.clear();
     m_gpioPinCount = 0;
+    m_gpioPorts.clear();
 
     m_gpioModel->resetPins({});
     m_adcModel->resetChannels(0, {});
@@ -242,14 +243,22 @@ void SimulationController::onOperationFailed(QString operation,
 
 void SimulationController::onGpioStatesUpdated(QString peripheralPath,
                                                 QVector<GpioPinData> pins) {
-    Q_UNUSED(peripheralPath)
-    m_gpioModel->resetPins(pins);
+    for (int i = 0; i < m_gpioPorts.size(); ++i) {
+        if (m_gpioPorts[i].path == peripheralPath) {
+            m_gpioModel->setPortPins(i, m_gpioPorts[i].name, pins);
+            return;
+        }
+    }
 }
 
 void SimulationController::onGpioPinChanged(QString peripheralPath,
                                              int pin, int newState) {
-    Q_UNUSED(peripheralPath)
-    m_gpioModel->updatePin(pin, newState);
+    for (int i = 0; i < m_gpioPorts.size(); ++i) {
+        if (m_gpioPorts[i].path == peripheralPath) {
+            m_gpioModel->updatePortPin(i, pin, newState);
+            return;
+        }
+    }
 }
 
 void SimulationController::onAdcDataUpdated(QString peripheralPath,
@@ -260,7 +269,10 @@ void SimulationController::onAdcDataUpdated(QString peripheralPath,
 }
 
 void SimulationController::onPeripheralsDiscovered(DiscoveredPeripherals discovered) {
-    // Store first discovered paths for setGpioPin / setAdcChannel
+    // Store all discovered GPIO ports (used for multi-port model updates)
+    m_gpioPorts = discovered.gpioPorts;
+
+    // Keep first-port shortcuts for setGpioPin / setAdcChannel
     if (!discovered.gpioPorts.isEmpty()) {
         m_gpioPath     = discovered.gpioPorts[0].path;
         m_gpioPinCount = discovered.gpioPorts[0].pinCount;

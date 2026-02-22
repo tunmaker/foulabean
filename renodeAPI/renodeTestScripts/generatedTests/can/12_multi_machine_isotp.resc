@@ -1,0 +1,33 @@
+# =============================================================================
+# CAN — Multi-Machine ISOTP Exchange
+# Validates: ISO-TP protocol across two machines (no loopback)
+# Platform:  STM32H753 CPU x2
+# Binary:    Zephyr ISOTP sample (no loopback)
+# =============================================================================
+
+using sysbus
+
+emulation CreateCANHub "canHub"
+
+# === Machine 0 (primary — "test-machine") ===
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/nucleo_h743zi--zephyr-samples-subsys-canbus-isotp.elf-s_1554512-549bcf52da77937f5c7a86dd407d3e9599e40938
+
+sysbus LoadELF $bin
+connector Connect sysbus.fdcan1 canHub
+
+# === Machine 1 ===
+mach create "test-machine-1"
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+sysbus LoadELF $bin
+connector Connect sysbus.fdcan1 canHub
+
+emulation SetGlobalSerialExecution true
+
+start

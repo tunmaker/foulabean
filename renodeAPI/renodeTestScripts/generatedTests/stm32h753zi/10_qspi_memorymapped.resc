@@ -1,0 +1,28 @@
+# =============================================================================
+# STM32H753ZI — QSPI Memory-Mapped Mode Test
+# Validates: QuadSPI memory-mapped access to external flash
+# Platform:  Nucleo H753ZI board + external QSPI flash
+# Binary:    STM32CubeH7 QSPI MemoryMapped sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/nucleo_h753zi.repl
+
+machine LoadPlatformDescriptionFromString "externalQspiFlash: SPI.Macronix_MX25R @ qspi {underlyingMemory: qspiMappedFlashMemory}"
+machine LoadPlatformDescriptionFromString "qspiMappedFlashMemory: Memory.MappedMemory @ sysbus 0x90000000 { size: 0x10000000 }"
+
+$bin?=@https://dl.antmicro.com/projects/renode/stm32cubeh7--stm32h753zi-QSPI_MemoryMapped.elf-s_2152312-faec8bb984c61aabb52ae9eec1598999ea906a1c
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+start

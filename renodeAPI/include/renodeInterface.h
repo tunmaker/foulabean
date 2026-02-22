@@ -123,7 +123,11 @@ public:
 
   // Get current emulation time with unit conversion helper
   Result<uint64_t> getCurrentTime(uint64_t &outValue, TimeUnit unit) noexcept;
-  
+
+  // Returns the raw socket file descriptor for monitoring purposes.
+  // The caller must NOT close or take ownership of this fd.
+  int getSocketFd() const noexcept;
+
 private:
   void send_bytes(const uint8_t *data, size_t len);
   std::vector<uint8_t> recv_response(ApiCommand expected_command);
@@ -173,5 +177,10 @@ private:
   std::unique_ptr<Impl> pimpl_;
   explicit Monitor(std::unique_ptr<Impl> impl) noexcept;
 };
+
+// Dispatch an async event by its event descriptor to registered callbacks.
+// Called by the event pump (RenodeEventDispatcher) when an ASYNC_EVENT frame
+// is received on the idle socket.
+void dispatchEvent(uint32_t eventDescriptor, const uint8_t *data, size_t size) noexcept;
 
 } // namespace renode

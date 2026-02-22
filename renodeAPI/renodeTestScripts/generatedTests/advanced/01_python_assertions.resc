@@ -1,0 +1,73 @@
+# =============================================================================
+# Advanced — Python Assertion Patterns for .resc Scripts
+# Demonstrates how to verify state without Robot Framework.
+# All patterns use "test-machine" naming convention.
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/nucleo_h753zi.repl
+
+# Load any binary — using blinky as example
+$bin?=@https://dl.antmicro.com/projects/renode/zephyr--nucleo-h753zi-blinky.elf-s_586204-d9aa33947652eb18930088c06704ad6a8cdc7fa4
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+# --- Pattern 1: Register value assertion ---
+# python """
+# val = monitor.Machine.SystemBus.ReadDoubleWord(0x40020414)  # GPIOB ODR
+# expected = 0x00000080  # Pin 7 high
+# if val != expected:
+#     raise Exception(f"GPIO ODR mismatch: expected {hex(expected)}, got {hex(val)}")
+# print(f"GPIO ODR check passed: {hex(val)}")
+# """
+
+# --- Pattern 2: Watchpoint-based halt on address write ---
+# python """
+# from Antmicro.Renode.Peripherals.Bus import Access, SysbusAccessWidth
+# bus = monitor.Machine.SystemBus
+#
+# def on_write(_, __, ___, value):
+#     if value == 0xCAFEBABE:
+#         print("SUCCESS: Test marker written!")
+#         monitor.Machine.Pause()
+#
+# bus.AddWatchpointHook(0x20000000, SysbusAccessWidth.DoubleWord, Access.Write, on_write)
+# """
+
+# --- Pattern 3: Time-bounded execution then check state ---
+# start
+# emulation RunFor "5"
+# pause
+# python """
+# val = monitor.Machine.SystemBus.ReadDoubleWord(0x40020414)
+# print(f"After 5s, GPIOB ODR = {hex(val)}")
+# """
+
+# --- Pattern 4: UART output capture ---
+# python """
+# uart = monitor.Machine["sysbus.usart3"]
+# collected = []
+#
+# def on_char(_, args):
+#     collected.append(chr(args.Byte))
+#     line = ''.join(collected)
+#     if line.endswith('\n'):
+#         print(f"UART: {line.strip()}")
+#         if "PASS" in line:
+#             print("TEST PASSED")
+#         collected.clear()
+#
+# uart.CharReceived += on_char
+# """
+
+start

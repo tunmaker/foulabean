@@ -1,0 +1,24 @@
+# =============================================================================
+# CAN — MCAN Loopback Socket Test (Single Machine)
+# Validates: FDCAN/MCAN controller in loopback mode via CAN hub
+# Platform:  STM32H753 CPU
+# Binary:    Zephyr CAN socket test (loopback)
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/nucleo_h743zi--zephyr-tests-net-socket-can.elf-s_724872-88ee55e384b5d68e4bd7a9a9a51faa47e9faa597
+
+sysbus LoadELF $bin
+
+emulation CreateCANHub "canHub" true
+connector Connect sysbus.fdcan1 canHub
+
+start

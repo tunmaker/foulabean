@@ -1,0 +1,29 @@
+# =============================================================================
+# Renesas DA14592 — UART Hello World Test
+# Validates: UART (uart1) serial output
+# Platform:  Renesas DA14592
+# Binary:    SDK UART hello world sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/renesas-da14592.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-uart_hello_world.bin-s_42820-89e34783fa568d03c826357dceaa80c3637c14e1
+$symbolsElf?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-uart_hello_world.elf-s_1302844-67f230aeae16f04f9e6e9e1ac1ab1ceb133dc2a1
+
+macro reset
+"""
+    sysbus LoadBinary $bin 0x0
+    sysbus LoadSymbolsFrom $symbolsElf
+"""
+runMacro $reset
+
+start
+
+# Expected output on uart1: "Hello, world!"

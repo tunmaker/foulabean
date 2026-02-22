@@ -1,0 +1,24 @@
+# =============================================================================
+# CAN — ISOTP Conformance Test
+# Validates: ISO-TP protocol conformance
+# Platform:  STM32H753 CPU
+# Binary:    Zephyr ISOTP conformance test
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/nucleo_h743zi--zephyr-tests-subsys-canbus-isotp-conformance.elf-s_1466100-749f79deb1ce2d791b1794454b8afd977825b6eb
+
+sysbus LoadELF $bin
+
+emulation CreateCANHub "canHub" true
+connector Connect sysbus.fdcan1 canHub
+
+start

@@ -1,0 +1,30 @@
+# =============================================================================
+# Renesas RA8M1 — SCI UART Test
+# Validates: SCI UART serial output via Segger RTT virtual console
+# Platform:  Renesas EK-RA8M1 board
+# Binary:    SCI UART sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/renesas-ek_ra8m1.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas_ek_ra8m1--sci_uart.elf-s_535224-63f8b0f8a025f09554a015f4b896f73b2cbeee43
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+# Segger RTT virtual console setup
+machine CreateVirtualConsole "segger_rtt"
+include @scripts/single-node/segger-rtt.py
+setup_segger_rtt sysbus.segger_rtt
+
+start

@@ -1,0 +1,30 @@
+# =============================================================================
+# Renesas RA8M1 — SCI SPI Test
+# Validates: SCI SPI controller
+# Platform:  Renesas EK-RA8M1 board
+# Binary:    SCI SPI sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/renesas-ek_ra8m1.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas_ek_ra8m1--sci_spi.elf-s_436396-52fced761b153c037fab56f23d65971e752af799
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+# Segger RTT virtual console setup
+machine CreateVirtualConsole "segger_rtt"
+include @scripts/single-node/segger-rtt.py
+setup_segger_rtt sysbus.segger_rtt
+
+start

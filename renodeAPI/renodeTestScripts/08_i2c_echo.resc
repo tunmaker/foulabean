@@ -1,0 +1,49 @@
+# =============================================================================
+# Renesas DA14592 — I2C Test (Echo Slave)
+# Validates: I2C controller with a mock DummyI2CSlave at address 0x75
+# Platform:  Renesas DA14592
+# Binary:    SDK I2C sample
+# =============================================================================
+
+using sysbus
+
+$name?="da14592-i2c"
+mach create $name
+
+machine LoadPlatformDescription @platforms/cpus/renesas-da14592.repl
+
+# Add a mock I2C echo slave at address 0x75
+machine LoadPlatformDescriptionFromString "dummy: Mocks.DummyI2CSlave @ i2c 0x75"
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-i2c_sample.bin-s_36032-0cb6f278b3467dfbbf80f14b8504db7f2552c113
+$symbolsElf?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-i2c_sample.elf-s_1500812-4323681e8ecb9c7ca31db357a86e0348477c6894
+
+macro reset
+"""
+    sysbus LoadBinary $bin 0x0
+    sysbus LoadSymbolsFrom $symbolsElf
+"""
+runMacro $reset
+
+# --- Set up echo behavior via Python ---
+# The slave echoes back whatever data it receives
+python """
+from Antmicro.Renode.Peripherals.I2C import DummyI2CSlave
+
+class EchoI2CPeripheral:
+    def __init__(self, dummy):
+        self.dummy = dummy
+
+    def write(self, data):
+        self.dummy.EnqueueResponseBytes(data)
+
+def mc_setup_echo_i2c_peripheral(path):
+    dummy = monitor.Machine[path]
+    dummy.DataReceived += EchoI2CPeripheral(dummy).write
+"""
+setup_echo_i2c_peripheral "sysbus.i2c.dummy"
+
+# --- Peripheral setup ---
+showAnalyzer sysbus.uart1
+
+start

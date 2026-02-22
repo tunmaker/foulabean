@@ -1,0 +1,60 @@
+# =============================================================================
+# Renesas RA8M1 — AGT Timer LED Blink Test
+# Validates: AGT timer, GPIO output (LED on port6), IRQ handling
+# Platform:  Renesas EK-RA8M1 board
+# Binary:    AGT timer/blinky sample
+# NOTE:      Binary prompts for one-shot mode delay on Segger RTT.
+#            Preset: sends "10" (10ms) automatically to avoid hanging.
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/renesas-ek_ra8m1.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas_ek_ra8m1--agt.elf-s_391008-c0a91e7f3d279b86269ca83ac0aabb9936f94838
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+# Segger RTT virtual console setup
+machine CreateVirtualConsole "segger_rtt"
+include @scripts/single-node/segger-rtt.py
+setup_segger_rtt sysbus.segger_rtt
+
+# Log GPIO port 6 (blue LED)
+logLevel -1 sysbus.port6
+
+# Auto-respond to the "One-shot mode:" prompt with a nominal 10ms delay
+# This prevents the script from hanging in headless mode.
+python """
+import time
+
+rtt = monitor.Machine["sysbus.segger_rtt"]
+buffer = []
+prompt_sent = False
+
+def on_char(_, args):
+    global buffer, prompt_sent
+    ch = chr(args.Byte)
+    buffer.append(ch)
+    line = ''.join(buffer)
+    if 'One-shot mode:' in line and not prompt_sent:
+        prompt_sent = True
+        for c in '10\n':
+            rtt.WriteChar(ord(c))
+        buffer = []
+    elif ch == '\n':
+        buffer = []
+
+rtt.CharReceived += on_char
+"""
+
+start

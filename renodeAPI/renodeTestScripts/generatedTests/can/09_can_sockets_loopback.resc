@@ -1,0 +1,24 @@
+# =============================================================================
+# CAN — CAN Sockets Loopback Test
+# Validates: CAN socket API in loopback mode
+# Platform:  STM32H753 CPU
+# Binary:    Zephyr CAN sockets loopback sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/nucleo_h743zi--zephyr-samples-net-sockets-can--loopback.elf-s_2246072-12c8e04ba0a5f9ef2181cffb9bd0a38321c8e182
+
+sysbus LoadELF $bin
+
+emulation CreateCANHub "canHub" true
+connector Connect sysbus.fdcan1 canHub
+
+start

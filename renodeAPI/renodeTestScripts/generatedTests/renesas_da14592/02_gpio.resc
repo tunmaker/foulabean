@@ -1,0 +1,34 @@
+# =============================================================================
+# Renesas DA14592 — GPIO Test
+# Validates: GPIO port pin toggling
+# Platform:  Renesas DA14592
+# Binary:    SDK GPIO sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/renesas-da14592.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-gpio_sample.bin-s_45084-d1c4c9a304a8b3176b3dc6feb89237ae3d48351a
+$symbolsElf?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-gpio_sample.elf-s_1309028-7708a94edad0e9f9d64725c562dd18e2aebb0d96
+
+macro reset
+"""
+    sysbus LoadBinary $bin 0x0
+    sysbus LoadSymbolsFrom $symbolsElf
+"""
+runMacro $reset
+
+logLevel -1 sysbus.gpio
+
+start
+
+# Expected output on uart1:
+# Initial GPIO port: 0 pin: 0 val: 0
+# Updated GPIO port: 0 pin: 0 val: 1
+# (repeated for port 0-1, pin 0-1)

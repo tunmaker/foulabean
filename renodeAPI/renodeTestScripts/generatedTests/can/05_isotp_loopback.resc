@@ -1,0 +1,24 @@
+# =============================================================================
+# CAN — ISOTP Loopback Test
+# Validates: ISO-TP (ISO 15765-2) transport protocol over CAN in loopback
+# Platform:  STM32H753 CPU
+# Binary:    Zephyr ISOTP loopback sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/stm32h753.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/nucleo_h743zi--zephyr-samples-subsys-canbus-isotp--loopback.elf-s_1554556-1a03849de5b83796ba0d541e279cc04ca1561106
+
+sysbus LoadELF $bin
+
+emulation CreateCANHub "canHub" true
+connector Connect sysbus.fdcan1 canHub
+
+start

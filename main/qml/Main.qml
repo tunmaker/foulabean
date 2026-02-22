@@ -184,6 +184,7 @@ ApplicationWindow {
                                 required property int pinNumber
                                 required property int pinState
                                 required property string stateName
+                                required property string portName
 
                                 spacing: 4
 
@@ -193,9 +194,9 @@ ApplicationWindow {
                                 }
 
                                 Label {
-                                    text: "Pin " + pinNumber + ": " + stateName
+                                    text: "[" + portName + "] Pin " + pinNumber + ": " + stateName
                                     font.family: "monospace"
-                                    Layout.preferredWidth: 120
+                                    Layout.preferredWidth: 160
                                 }
                             }
                         }

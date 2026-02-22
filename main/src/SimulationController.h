@@ -143,8 +143,9 @@ private:
 
     // Peripheral parameters — populated by doDiscoverPeripherals
     int m_gpioPinCount = 0;
-    QString m_gpioPath;
+    QString m_gpioPath;    // first port, used by setGpioPin()
     QString m_adcPath;
+    QVector<GpioPortInfo> m_gpioPorts; // all discovered GPIO ports
 
     // Owned objects
     GpioModel *m_gpioModel = nullptr;

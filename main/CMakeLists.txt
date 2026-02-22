@@ -13,6 +13,7 @@ set(MAIN_QML
 qt_add_executable(${TARGET_NAME}
     src/main.cpp
     src/BridgeTypes.h
+    src/RenodeEventDispatcher.h src/RenodeEventDispatcher.cpp
     src/RenodeWorker.h src/RenodeWorker.cpp
     src/GpioModel.h src/GpioModel.cpp
     src/AdcModel.h src/AdcModel.cpp

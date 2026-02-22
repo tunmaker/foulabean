@@ -19,6 +19,8 @@ class Adc;
 enum class GpioState : uint8_t;
 }
 
+class RenodeEventDispatcher;
+
 class RenodeWorker : public QObject {
     Q_OBJECT
 
@@ -77,4 +79,6 @@ private:
                                std::shared_ptr<renode::Gpio> gpio,
                                int pinCount);
     void cleanupCallbacks();
+
+    RenodeEventDispatcher *m_eventDispatcher = nullptr;
 };

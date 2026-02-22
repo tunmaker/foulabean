@@ -1,0 +1,23 @@
+# Renode test script: Renesas RA8M1 — UART
+# This script creates an RA8M1 machine, loads a SCI UART sample binary,
+# and opens a terminal analyser on the UART so you can see serial output.
+
+using sysbus
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/renesas-ek_ra8m1.repl
+
+set bin @https://dl.antmicro.com/projects/renode/renesas_ek_ra8m1--sci_uart.elf-s_535224-63f8b0f8a025f09554a015f4b896f73b2cbeee43
+macro reset "sysbus LoadELF $bin"
+runMacro $reset
+
+# Open a terminal window on the Segger RTT virtual console
+machine CreateVirtualConsole "segger_rtt"
+include @scripts/single-node/segger-rtt.py
+setup_segger_rtt sysbus.segger_rtt
+showAnalyzer sysbus.segger_rtt
+
+start

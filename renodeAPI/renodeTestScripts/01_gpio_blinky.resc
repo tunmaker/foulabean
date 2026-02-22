@@ -1,0 +1,35 @@
+# =============================================================================
+# STM32H753ZI — GPIO Blinky Test
+# Validates: GPIO output toggling (LED blink via gpioPortB)
+# Platform:  Nucleo H753ZI board
+# Binary:    Zephyr blinky sample
+# =============================================================================
+
+using sysbus
+
+$name?="test-machine"
+mach create $name
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/nucleo_h753zi.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/zephyr--nucleo-h753zi-blinky.elf-s_586204-d9aa33947652eb18930088c06704ad6a8cdc7fa4
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+# --- Peripheral setup ---
+showAnalyzer sysbus.usart3
+
+# Log GPIO state changes on port B (user LEDs are typically on port B)
+logLevel -1 sysbus.gpioPortB
+
+# Optional: watch a specific LED pin state periodically
+# watch "gpioPortB State" 500
+
+start

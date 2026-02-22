@@ -1,6 +1,7 @@
 #include "renodeMachine.h"
 #include "renodeInterface.h"
 #include "renodeInternal.h"
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -37,6 +38,7 @@ struct Gpio::Impl {
   int nextCbHandle = 1;
   std::map<int, GpioCallback> callbacks;
   std::map<int, uint32_t> handleToServerEd;  // Maps local handle to server event descriptor
+  std::map<int, std::vector<int>> pinToHandles_;  // Maps pin number to list of handles
 
   Impl(const std::string &p, AMachine::Impl *m) : path(p), machine(m) {}
 };
@@ -710,9 +712,15 @@ Error Gpio::setState(int pin, GpioState state) noexcept {
     // Send command (expect SUCCESS_WITHOUT_DATA, empty response)
     pimpl_->machine->renodeClient->send_command(ApiCommand::GPIO, payload);
 
-    // Trigger callbacks for state change (only after successful server update)
-    for (auto &kv : pimpl_->callbacks) {
-      kv.second(pin, state);
+    // Trigger only callbacks registered for this specific pin
+    auto pit = pimpl_->pinToHandles_.find(pin);
+    if (pit != pimpl_->pinToHandles_.end()) {
+      for (int h : pit->second) {
+        auto cbIt = pimpl_->callbacks.find(h);
+        if (cbIt != pimpl_->callbacks.end()) {
+          try { cbIt->second(pin, state); } catch (...) {}
+        }
+      }
     }
 
     return {0, ""};
@@ -775,6 +783,7 @@ Error Gpio::registerStateChangeCallback(int pin, GpioCallback cb, int &outHandle
     // Store mappings
     pimpl_->callbacks.emplace(handle, std::move(cb));
     pimpl_->handleToServerEd[handle] = serverEd;
+    pimpl_->pinToHandles_[pin].push_back(handle);
     outHandle = handle;
 
     return {0, ""};
@@ -806,6 +815,15 @@ Error Gpio::unregisterStateChangeCallback(int handle) noexcept {
   }
 
   pimpl_->callbacks.erase(handle);
+
+  // Remove handle from pinToHandles_
+  for (auto &[p, handles] : pimpl_->pinToHandles_) {
+    auto it = std::find(handles.begin(), handles.end(), handle);
+    if (it != handles.end()) {
+      handles.erase(it);
+      break;
+    }
+  }
 
   return {0, ""};
 }

@@ -1,0 +1,27 @@
+# =============================================================================
+# STM32H753ZI — Ethernet Echo Server Test
+# Validates: Ethernet MAC (SynopsysEthernetMAC), TCP/UDP networking
+# Platform:  Nucleo H753ZI board
+# Binary:    Zephyr echo server sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/nucleo_h753zi.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/zephyr-nucleo_h753zi_echo_server.elf-s_3820436-2a55e73d28b438666b588d87cc9822365ee46cf6
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+logLevel -1 sysbus.ethernet
+
+start

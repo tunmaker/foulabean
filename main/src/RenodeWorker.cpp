@@ -1,4 +1,5 @@
 #include "RenodeWorker.h"
+#include "RenodeEventDispatcher.h"
 
 #include "renodeInterface.h"
 #include "renodeMachine.h"
@@ -53,6 +54,17 @@ void RenodeWorker::doConnect(QString renodePath, QString scriptPath,
         qDebug("[Worker] getMachine OK: name=%s id=%s",
                m_machine->name().c_str(), m_machine->id().c_str());
 
+        // Start event dispatcher: watches the idle socket for ASYNC_EVENT frames
+        // and dispatches them to registered GPIO callbacks without polling.
+        int fd = m_client->getSocketFd();
+        m_eventDispatcher = new RenodeEventDispatcher(
+            fd,
+            [](uint32_t ed, const uint8_t *data, size_t size) {
+                renode::dispatchEvent(ed, data, size);
+            },
+            this);
+        qDebug("[Worker] event dispatcher started on fd=%d", fd);
+
         emit connected(QString::fromStdString(m_machine->name()),
                         QString::fromStdString(m_machine->id()));
     } catch (const renode::RenodeException &e) {
@@ -65,6 +77,9 @@ void RenodeWorker::doConnect(QString renodePath, QString scriptPath,
 
 void RenodeWorker::doDisconnect() {
     qDebug("[Worker] doDisconnect");
+    // Stop event dispatcher before closing socket
+    delete m_eventDispatcher;
+    m_eventDispatcher = nullptr;
     cleanupCallbacks();
     m_adcs.clear();
     m_gpios.clear();
@@ -345,13 +360,6 @@ void RenodeWorker::doDiscoverPeripherals() {
             }
             m_gpios[stdPath] = gpio;
 
-            // Register callback only once per path
-            bool already = false;
-            for (const auto &[hp, hnd] : m_gpioCallbackHandles)
-                if (hp == stdPath) { already = true; break; }
-            if (!already)
-                registerGpioCallbacks(stdPath, gpio, 1);
-
             // Probe accessible pin count (up to 64)
             int pinCount = 0;
             for (int i = 0; i < 64; ++i) {
@@ -366,6 +374,14 @@ void RenodeWorker::doDiscoverPeripherals() {
                 continue;
             }
             qDebug("[Discovery] GPIO %s: %d pins", qPrintable(path), pinCount);
+
+            // Register one callback per pin so server ASYNC_EVENTs arrive for all pins
+            bool already = false;
+            for (const auto &[hp, hnd] : m_gpioCallbackHandles)
+                if (hp == stdPath) { already = true; break; }
+            if (!already)
+                registerGpioCallbacks(stdPath, gpio, pinCount);
+
             gpioPorts.append({path, shortName, pinCount});
 
         } else if (typeDesc.contains(QLatin1String("ADC"), Qt::CaseInsensitive)) {
@@ -392,22 +408,29 @@ void RenodeWorker::doDiscoverPeripherals() {
 void RenodeWorker::registerGpioCallbacks(const std::string &path,
                                           std::shared_ptr<renode::Gpio> gpio,
                                           int pinCount) {
-    // Register ONE callback for all pins. setState() fires every registered callback
-    // regardless of pin, so per-pin registration causes N×N callback storms.
-    // The `p` argument inside the lambda is the actual pin that changed.
+    // GPIO_REGISTER_EVENT is per-pin on the server side: Renode sends ASYNC_EVENT
+    // only for the specific pin registered. Register one callback per pin so that
+    // simulation-driven state changes are delivered for every pin.
+    // The `p` argument from the server wrapperCb carries the registration pin;
+    // use it directly so the local setState path (which fires all callbacks) also
+    // delivers the correct pin via the captured `pin` variable.
     QString qpath = QString::fromStdString(path);
-    int handle = -1;
-    renode::Error err = gpio->registerStateChangeCallback(
-        0,
-        [this, qpath](int p, renode::GpioState newState) {
-            qDebug("[GPIO callback] pin %d -> state %d", p, static_cast<int>(newState));
-            emit gpioPinChanged(qpath, p, static_cast<int>(newState));
-        },
-        handle);
-    if (!err && handle >= 0) {
-        m_gpioCallbackHandles.push_back({path, handle});
-    } else {
-        qWarning("[GPIO] registerStateChangeCallback failed: %s", err.message.c_str());
+    for (int pin = 0; pin < pinCount; ++pin) {
+        int handle = -1;
+        renode::Error err = gpio->registerStateChangeCallback(
+            pin,
+            [this, qpath, pin](int /*p*/, renode::GpioState newState) {
+                qDebug("[GPIO callback] %s pin %d -> state %d",
+                       qPrintable(qpath), pin, static_cast<int>(newState));
+                emit gpioPinChanged(qpath, pin, static_cast<int>(newState));
+            },
+            handle);
+        if (!err && handle >= 0) {
+            m_gpioCallbackHandles.push_back({path, handle});
+        } else {
+            qWarning("[GPIO] registerStateChangeCallback failed for pin %d: %s",
+                     pin, err.message.c_str());
+        }
     }
 }
 

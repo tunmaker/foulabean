@@ -1,0 +1,25 @@
+# =============================================================================
+# STM32H753ZI — Crypto Accelerator AES-GCM Test
+# Validates: STM32H7 CRYP peripheral (AES-GCM mode)
+# Platform:  Nucleo H753ZI board
+# Binary:    STM32CubeH7 CRYP AES-GCM sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/boards/nucleo_h753zi.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/stm32cubeh7--stm32h753zi-CRYP_AESGCM.elf-s_2136368-45a90683e4f954667a464fc8fa9ce57d0b74ac09
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset
+
+start

@@ -17,15 +17,17 @@ QVariant GpioModel::data(const QModelIndex &index, int role) const {
     case PinNumberRole:  return entry.pin;
     case StateRole:      return entry.state;
     case StateNameRole:  return stateToString(entry.state);
+    case PortNameRole:   return entry.portName;
     default:             return {};
     }
 }
 
 QHash<int, QByteArray> GpioModel::roleNames() const {
     return {
-        {PinNumberRole, "pinNumber"},
-        {StateRole, "pinState"},
-        {StateNameRole, "stateName"},
+        {PinNumberRole,  "pinNumber"},
+        {StateRole,      "pinState"},
+        {StateNameRole,  "stateName"},
+        {PortNameRole,   "portName"},
     };
 }
 
@@ -38,14 +40,32 @@ void GpioModel::resetPins(const QVector<GpioPinData> &pins) {
     m_pins.clear();
     m_pins.reserve(pins.size());
     for (const auto &p : pins) {
-        m_pins.append({p.pin, p.state});
+        m_pins.append({0, QString(), p.pin, p.state});
     }
     endResetModel();
     emit pinCountChanged();
 }
 
-void GpioModel::updatePin(int pin, int newState) {
-    int row = findPinRow(pin);
+void GpioModel::setPortPins(int portIndex, const QString &portName, const QVector<GpioPinData> &pins) {
+    beginResetModel();
+    // Remove existing entries for this port
+    auto it = m_pins.begin();
+    while (it != m_pins.end()) {
+        if (it->portIndex == portIndex)
+            it = m_pins.erase(it);
+        else
+            ++it;
+    }
+    // Append new entries
+    for (const auto &p : pins) {
+        m_pins.append({portIndex, portName, p.pin, p.state});
+    }
+    endResetModel();
+    emit pinCountChanged();
+}
+
+void GpioModel::updatePortPin(int portIndex, int pin, int newState) {
+    int row = findPortPinRow(portIndex, pin);
     if (row < 0) return;
     if (m_pins[row].state == newState) return;
     m_pins[row].state = newState;
@@ -62,9 +82,10 @@ QString GpioModel::stateToString(int state) {
     }
 }
 
-int GpioModel::findPinRow(int pin) const {
+int GpioModel::findPortPinRow(int portIndex, int pin) const {
     for (int i = 0; i < m_pins.size(); ++i) {
-        if (m_pins[i].pin == pin) return i;
+        if (m_pins[i].portIndex == portIndex && m_pins[i].pin == pin)
+            return i;
     }
     return -1;
 }

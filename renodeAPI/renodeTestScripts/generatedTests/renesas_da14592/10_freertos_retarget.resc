@@ -1,0 +1,27 @@
+# =============================================================================
+# Renesas DA14592 — FreeRTOS Retarget (UART) Test
+# Validates: UART output under FreeRTOS (retargeted printf)
+# Platform:  Renesas DA14592
+# Binary:    SDK FreeRTOS retarget sample
+# =============================================================================
+
+using sysbus
+
+mach create "test-machine"
+
+# Start the External Control Server for API access
+emulation CreateExternalControlServer "api-server" 5555
+
+machine LoadPlatformDescription @platforms/cpus/renesas-da14592.repl
+
+$bin?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-freertos_retarget.bin-s_63072-e28ce2134937840990ae4be78a3da330595f48e8
+$symbolsElf?=@https://dl.antmicro.com/projects/renode/renesas-da1459x-freertos_retarget.elf-s_1379120-5728b9a9cca03e23e66c32db302e356532fcfc52
+
+macro reset
+"""
+    sysbus LoadBinary $bin 0x0
+    sysbus LoadSymbolsFrom $symbolsElf
+"""
+runMacro $reset
+
+start
